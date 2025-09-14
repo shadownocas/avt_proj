@@ -1,0 +1,7 @@
+﻿  lightDemo.cpp
+C:\Users\iness\Documents\mestrado\avt\MyAVT_Template\MyAVT_Template\MyAVT_Template\lightDemo.cpp(166,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\MyAVT_Template\MyAVT_Template\MyAVT_Template\lightDemo.cpp(166,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\MyAVT_Template\MyAVT_Template\MyAVT_Template\lightDemo.cpp(584,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\iness\Documents\mestrado\avt\MyAVT_Template\MyAVT_Template\MyAVT_Template\lightDemo.cpp(587,22): warning C4305: '=': truncation from 'double' to 'float'
+  MyAVT_Template.vcxproj -> C:\Users\iness\Documents\mestrado\avt\MyAVT_Template\MyAVT_Template\x64\Debug\MyAVT_Template.exe
+  0 File(s) copied
