@@ -225,7 +225,13 @@ void renderSim(void) {
 	renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
 
 	renderer.setTexUnit(0, 0);
-	renderer.setTexUnit(1, 1); //put texture to a mesh
+	renderer.setTexUnit(1, 1);
+	renderer.setTexUnit(2, 2);
+	renderer.setTexUnit(3, 3);
+	renderer.setTexUnit(4, 4);
+
+
+	
 
 	dronePosition();
 	updateCamera();
@@ -259,7 +265,7 @@ void renderSim(void) {
 	mu.computeNormalMatrix3x3();
 
 	data.meshID = 0;
-	data.texMode = 1; //modulate diffuse color with texel color
+	data.texMode = 2; //modulate diffuse color with texel color
 	data.vm = mu.get(gmu::VIEW_MODEL),
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
@@ -300,7 +306,7 @@ void renderSim(void) {
 				mu.computeNormalMatrix3x3();
 
 				data.meshID = 1;
-				data.texMode = 1;
+				data.texMode = 3;
 				data.vm = mu.get(gmu::VIEW_MODEL);
 				data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 				data.normal = mu.getNormalMatrix();
@@ -332,7 +338,7 @@ void renderSim(void) {
 		mu.computeNormalMatrix3x3();
 
 		data.meshID = 1; // lamppost mesh
-		data.texMode = 1;
+		data.texMode = 4;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -514,11 +520,10 @@ void buildScene()
 	renderer.TexObjArray.texture2D_Loader("assets/stone.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/checker.png");
 	renderer.TexObjArray.texture2D_Loader("assets/lightwood.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");    // 4 = buildings
+	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");  
+	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");  
 
-	/* renderer.TexObjArray.texture2D_Loader("assets/stone.tga");      // 0 = floor
-	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");      // 2 = lampposts
- */
+	
 
 	//Scene geometry with triangle meshes
 

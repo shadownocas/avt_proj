@@ -21,6 +21,9 @@ uniform Materials mat;
 uniform sampler2D texmap;
 uniform sampler2D texmap1;
 uniform sampler2D texmap2;
+uniform sampler2D texmap3;
+uniform sampler2D texmap4;
+
 
 uniform int texMode;
 uniform bool spotlight_mode;
@@ -78,10 +81,15 @@ void main() {
 		texel = texture(texmap, DataIn.tex_coord);  // texel from stone.tga
 		colorOut = vec4(max(intensity*texel + spec, 0.07*texel).rgb, 1.0);
 	}
-	else // multitexturing
+	else if (texMode == 3) // diffuse color is replaced by texel color
 	{
-		texel = texture(texmap2, DataIn.tex_coord);  // texel from lighwood.tga
-		texel1 = texture(texmap1, DataIn.tex_coord);  // texel from checker.tga
-		colorOut = vec4(max(intensity*texel*texel1 + spec, 0.07*texel*texel1).rgb, 1.0);
+		texel = texture(texmap3, DataIn.tex_coord);  // texel from brick.tga
+		colorOut = vec4(max(intensity*texel + spec, 0.07*texel).rgb, 1.0);
 	}
+	else if (texMode == 4) // diffuse color is replaced by texel color
+	{
+		texel = texture(texmap4, DataIn.tex_coord);  // texel from metal.tga
+		colorOut = vec4(max(intensity*texel + spec, 0.07*texel).rgb, 1.0);
+	}
+
 }
