@@ -59,6 +59,19 @@ struct Drone {
     float direction[3] = {0.0f, 0.0f, -1.0f}; // pointing along -Z initially
 };
 
+struct FlyingObject {
+    float position[3];
+    float direction[3];
+    float speed;
+    float rotationAngle;
+    float rotationSpeed;
+    int meshID; // which geometry primitive to use
+    bool active;
+};
+
+std::vector<FlyingObject> flyingObjects;
+
+
 Drone drone;
 float droneSpeed = 0.2f;       // units per frame
 float followDistance = 15.0f;  // camera distance behind drone
@@ -236,6 +249,36 @@ void renderSim(void) {
 	dronePosition();
 	updateCamera();
 
+	// ----- UPDATE FLYING OBJECTS -----
+	for (auto &obj : flyingObjects) {
+		// Move forward
+		obj.position[0] += obj.direction[0] * obj.speed;
+		obj.position[1] += obj.direction[1] * obj.speed;
+		obj.position[2] += obj.direction[2] * obj.speed;
+
+		// Rotate while moving
+		obj.rotationAngle += obj.rotationSpeed;
+		if (obj.rotationAngle > 360.0f) obj.rotationAngle -= 360.0f;
+
+		// Increase speed slightly with play time
+		obj.speed *= 1.0001f;
+
+		// Respawn if out of visible region
+		if (fabs(obj.position[0]) > 150 || fabs(obj.position[2]) > 150) {
+			obj.position[0] = (rand() % 200 - 100);
+			obj.position[1] = 10.0f + rand() % 30;
+			obj.position[2] = (rand() % 200 - 100);
+
+			float angle = (rand() % 360) * 3.14159f / 180.0f;
+			obj.direction[0] = cos(angle);
+			obj.direction[1] = 0.0f;
+			obj.direction[2] = sin(angle);
+
+			obj.speed = 0.05f + (rand() % 10) * 0.01f;
+			obj.rotationAngle = 0.0f;
+		}
+	}
+
 	// load identity matrices
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::MODEL);
@@ -255,6 +298,25 @@ void renderSim(void) {
 	renderer.setSpotParam(coneDir, 2.0f);
 
 	dataMesh data;
+
+		// ----- RENDER FLYING OBJECTS -----
+	for (auto &obj : flyingObjects) {
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, obj.position[0], obj.position[1], obj.position[2]);
+		mu.rotate(gmu::MODEL, obj.rotationAngle, 0.0f, 1.0f, 0.0f);
+
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+
+		data.meshID = obj.meshID;
+		data.texMode = 1;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+
+		mu.popMatrix(gmu::MODEL);
+	}
 	
 	// Draw the floor - myMeshes[0] contains the cube object
 	mu.pushMatrix(gmu::MODEL);
@@ -591,6 +653,49 @@ void buildScene()
 	cams[1].camPos[1] = 200.0;
 	cams[1].camPos[2] = 0.33;
 	cams[1].type = 1;
+
+	// ----- FLYING OBJECTS GEOMETRY -----
+	MyMesh sphere = createSphere(1.0f, 16);
+	memcpy(sphere.mat.ambient, amb1, 4 * sizeof(float));
+	memcpy(sphere.mat.diffuse, diff1, 4 * sizeof(float));
+	memcpy(sphere.mat.specular, spec1, 4 * sizeof(float));
+	memcpy(sphere.mat.emissive, emissive, 4 * sizeof(float));
+	sphere.mat.shininess = shininess;
+	sphere.mat.texCount = texcount;
+	renderer.myMeshes.push_back(sphere);
+
+	MyMesh cone = createCone(2.0f, 1.0f, 20);
+	memcpy(cone.mat.ambient, amb, 4 * sizeof(float));
+	memcpy(cone.mat.diffuse, diff, 4 * sizeof(float));
+	memcpy(cone.mat.specular, spec, 4 * sizeof(float));
+	memcpy(cone.mat.emissive, emissive, 4 * sizeof(float));
+	cone.mat.shininess = shininess;
+	cone.mat.texCount = texcount;
+	renderer.myMeshes.push_back(cone);
+
+	// ----- INITIALIZE FLYING OBJECTS -----
+	for (int i = 0; i < 10; i++) {
+		FlyingObject obj;
+
+		// random spawn position in XZ plane
+		obj.position[0] = (rand() % 200 - 100);
+		obj.position[1] = 10.0f + rand() % 30;   // altitude between 10–40
+		obj.position[2] = (rand() % 200 - 100);
+
+		// random direction in XZ plane
+		float angle = (rand() % 360) * 3.14159f / 180.0f;
+		obj.direction[0] = cos(angle);
+		obj.direction[1] = 0.0f;
+		obj.direction[2] = sin(angle);
+
+		obj.speed = 0.05f + (rand() % 10) * 0.01f;   // 0.05 – 0.15
+		obj.rotationAngle = 0.0f;
+		obj.rotationSpeed = 1.0f + (rand() % 5);     // 1 – 5 degrees per frame
+		obj.meshID = 2 + (i % 2);                    // 2 = sphere, 3 = cone
+		obj.active = true;
+
+		flyingObjects.push_back(obj);
+	}
 }
 
 // ------------------------------------------------------------
