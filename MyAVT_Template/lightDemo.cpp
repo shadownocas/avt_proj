@@ -347,59 +347,55 @@ void renderSim(void) {
 
 	renderer.setLampLights(pointLights, lampsOn);
 
-	float headlightOffsetX = 0.5f;  // left/right from drone center
-float headlightOffsetY = -0.2f; // slightly below drone center
-float headlightForward = 1.0f;  // forward along drone
+		// --- Headlight offsets in LOCAL space of the cube ---
+	float localHeadlightOffsets[2][4] = {
+		{ -0.5f,  0.0f,  1.0f, 1.0f },  // left headlight
+		{  0.5f,  0.0f,  1.0f, 1.0f }   // right headlight
+	};
 
-for (int i = 0; i < 2; ++i) {
-    float offsetX = (i == 0) ? -headlightOffsetX : headlightOffsetX;
+	// Compute drone's rotation matrix (same yaw you use to render cube)
+	float angle_Y = atan2(drone.direction[0], -drone.direction[2]);
+	mu.pushMatrix(gmu::MODEL);
+	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
+	mu.rotate(gmu::MODEL, angle_Y * 180.0f / 3.14159f, 0.0f, 1.0f, 0.0f);
 
-    // World-space position of the headlight
-    float worldPos[4] = {
-        drone.position[0] + offsetX,
-        drone.position[1] + headlightOffsetY,
-        drone.position[2] + headlightForward,
-        1.0f
-    };
+	// For each headlight
+	for (int i = 0; i < 2; i++) {
+		float worldPos[4];
+		mu.multMatrixPoint(gmu::MODEL, localHeadlightOffsets[i], worldPos);
 
-    // Rotate around Y based on drone yaw
-    float yaw = atan2(-drone.direction[2], drone.direction[0]);
-    float cosYaw = cos(yaw);
-    float sinYaw = sin(yaw);
-    float relX = worldPos[0] - drone.position[0];
-    float relZ = worldPos[2] - drone.position[2];
-    worldPos[0] = drone.position[0] + relX * cosYaw - relZ * sinYaw;
-    worldPos[2] = drone.position[2] + relX * sinYaw + relZ * cosYaw;
+		// Convert to eye space
+		float eyePos[4];
+		mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
 
-    // Convert position to eye space
-    float eyePos[4];
-    mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+		droneHeadlights[i].Position[0] = eyePos[0];
+		droneHeadlights[i].Position[1] = eyePos[1];
+		droneHeadlights[i].Position[2] = eyePos[2];
 
-    // Set position
-    droneHeadlights[i].Position[0] = eyePos[0];
-    droneHeadlights[i].Position[1] = eyePos[1];
-    droneHeadlights[i].Position[2] = eyePos[2];
+		// Forward direction of drone (local Z axis)
+		float localDir[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
+		float worldDir[4];
+		mu.multMatrixPoint(gmu::MODEL, localDir, worldDir);
 
-    // Direction is drone forward vector in eye space
-    float worldDir[4] = { drone.direction[0], drone.direction[1], drone.direction[2], 0.0f };
-    float eyeDir[4];
-    mu.multMatrixPoint(gmu::VIEW, worldDir, eyeDir);
-    droneHeadlights[i].Direction[0] = eyeDir[0];
-    droneHeadlights[i].Direction[1] = eyeDir[1];
-    droneHeadlights[i].Direction[2] = eyeDir[2];
+		float eyeDir[4];
+		mu.multMatrixPoint(gmu::VIEW, worldDir, eyeDir);
 
-    droneHeadlights[i].Color[0] = 1.0f;
-    droneHeadlights[i].Color[1] = 1.0f;
-    droneHeadlights[i].Color[2] = 0.9f;
-    droneHeadlights[i].atten.constant = 1.0f;
-    droneHeadlights[i].atten.linear = 0.1f;
-    droneHeadlights[i].atten.exp = 0.01f;
-    droneHeadlights[i].Cutoff = cosf(20.0f * 3.14159f / 180.0f); // 20 deg cone
-}
+		droneHeadlights[i].Direction[0] = eyeDir[0];
+		droneHeadlights[i].Direction[1] = eyeDir[1];
+		droneHeadlights[i].Direction[2] = eyeDir[2];
+
+		droneHeadlights[i].Color[0] = 1.0f;
+		droneHeadlights[i].Color[1] = 1.0f;
+		droneHeadlights[i].Color[2] = 0.9f;
+		droneHeadlights[i].atten.constant = 1.0f;
+		droneHeadlights[i].atten.linear   = 0.1f;
+		droneHeadlights[i].atten.exp      = 0.01f;
+		droneHeadlights[i].Cutoff = cosf(20.0f * 3.14159f / 180.0f);
+	}
+	mu.popMatrix(gmu::MODEL);
+
 
 	renderer.setDroneSpotLights(droneHeadlights, 2, spotlight_mode);
-
-
 
 
 	dataMesh data;
