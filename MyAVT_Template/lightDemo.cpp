@@ -88,6 +88,11 @@ Camera cams[3];
 
 int activeCam = 0;
 
+bool lampsOn = true; // all lamps initially on
+
+std::vector<Lamp> lampPositions;
+
+
 // Mouse Tracking Variables
 int startX, startY, tracking = 0;
 
@@ -99,6 +104,10 @@ float r = 45.0f;
 long myTime,timebase = 0,frame = 0;
 char s[32];
 
+bool dayMode = true;                 // Day/night toggle
+float dirLightDir[3] = { -0.5f, -1.0f, -0.3f };  // Direction of sunlight
+float dirLightColor[3] = { 1.0f, 1.0f, 0.9f };   // Day color
+float nightLightColor[3] = { 0.1f, 0.1f, 0.2f }; // Night ambient color
 
 float lightPos[4] = {4.0f, 20.0f, 2.0f, 1.0f};
 //float lightPos[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -229,25 +238,33 @@ void updateCamera(){
 		mu.ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, -500.0f, 500.0f);
 	}
 }
-
 void renderSim(void) {
 
-	FrameCount++;
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    FrameCount++;
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
+    renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
 
-	renderer.setTexUnit(0, 0);
-	renderer.setTexUnit(1, 1);
-	renderer.setTexUnit(2, 2);
-	renderer.setTexUnit(3, 3);
-	renderer.setTexUnit(4, 4);
+    renderer.setTexUnit(0, 0);
+    renderer.setTexUnit(1, 1);
+    renderer.setTexUnit(2, 2);
+    renderer.setTexUnit(3, 3);
+    renderer.setTexUnit(4, 4);
 
+    // Update drone movement
+    dronePosition();
+    updateCamera();
 
-	
+    // --- Set camera/view ---
+    mu.loadIdentity(gmu::VIEW);
+    mu.loadIdentity(gmu::MODEL);
+    mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
+              cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0,1,0);
 
-	dronePosition();
-	updateCamera();
+    // --- Light positions ---
+    float lposAux[4];
+    mu.multMatrixPoint(gmu::VIEW, lightPos, lposAux);   
+    renderer.setLightPos(lposAux);
 
 	// ----- UPDATE FLYING OBJECTS -----
 	for (auto &obj : flyingObjects) {
@@ -285,17 +302,36 @@ void renderSim(void) {
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
 	cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0,1,0);
+    // Spotlight settings
+    renderer.setSpotLightMode(spotlight_mode);
+    renderer.setSpotParam(coneDir, 2.0f);
 
-	//send the light position in eye coordinates
-	//renderer.setLightPos(lightPos); //efeito capacete do mineiro, ou seja lighPos foi definido em eye coord 
+    // Directional light
+    float dirLightWorld[4] = { 0.5f, -0.7f, 0.3f, 0.0f };
+    float dirLightEye[4];
+    mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
+    float dirLightEye3[3] = { dirLightEye[0], dirLightEye[1], dirLightEye[2] };
 
-	float lposAux[4];
-	mu.multMatrixPoint(gmu::VIEW, lightPos, lposAux);   //lightPos definido em World Coord so is converted to eye space
-	renderer.setLightPos(lposAux);
+    float lightColor[3] = {1.0f, 1.0f, 0.9f};
+    if(!dayMode) {
+        lightColor[0] = 0.1f; 
+        lightColor[1] = 0.1f; 
+        lightColor[2] = 0.2f;
+    }
+    renderer.setDirectionalLight(dirLightEye3, lightColor);
 
-	//Spotlight settings
-	renderer.setSpotLightMode(spotlight_mode);
-	renderer.setSpotParam(coneDir, 2.0f);
+    // --- Build lamp positions before sending to shader ---
+    lampPositions.clear();
+    for (int i = 0; i < numLamps; ++i) {
+        int r = i;
+        int c = i;
+        float x = offsetX + c * (10.0f + gap) + lampOffset;
+        float z = offsetZ + r * (10.0f + gap);
+        float y = lampHeight;
+        lampPositions.push_back({x, y, z});
+    }
+	// Send lamp data to shader
+    renderer.setLampLights(lampPositions, mu, lampsOn);
 
 	dataMesh data;
 
@@ -317,110 +353,94 @@ void renderSim(void) {
 
 		mu.popMatrix(gmu::MODEL);
 	}
-	
-	// Draw the floor - myMeshes[0] contains the cube object
-	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
-	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
 
-	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-	mu.computeNormalMatrix3x3();
+    // --- Draw floor ---
+    mu.pushMatrix(gmu::MODEL);
+    mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
+    mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
+    mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+    mu.computeNormalMatrix3x3();
 
-	data.meshID = 0;
-	data.texMode = 2; //modulate diffuse color with texel color
-	data.vm = mu.get(gmu::VIEW_MODEL),
-	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-	data.normal = mu.getNormalMatrix();
-	renderer.renderMesh(data);
-	mu.popMatrix(gmu::MODEL);
+    data.meshID = 0;
+    data.texMode = 2;
+    data.vm = mu.get(gmu::VIEW_MODEL);
+    data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+    data.normal = mu.getNormalMatrix();
+    renderer.renderMesh(data);
+    mu.popMatrix(gmu::MODEL);
 
-	//draw DRONE
-	mu.pushMatrix(gmu::MODEL);
-	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
+    // --- Draw drone ---
+    mu.pushMatrix(gmu::MODEL);
+    mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
+    float angleY = atan2(drone.direction[0], -drone.direction[2]) * 180.0f / 3.14159f;
+    mu.rotate(gmu::MODEL, angleY, 0.0f, 1.0f, 0.0f);
+    mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+    mu.computeNormalMatrix3x3();
 
-	float angleY = atan2(drone.direction[0], -drone.direction[2]) * 180.0f / 3.14159f;
-	mu.rotate(gmu::MODEL, angleY, 0.0f, 1.0f, 0.0f);
+    data.meshID = 1;
+    data.texMode = 4;
+    data.vm = mu.get(gmu::VIEW_MODEL);
+    data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+    data.normal = mu.getNormalMatrix();
+    renderer.renderMesh(data);
+    mu.popMatrix(gmu::MODEL);
 
-	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-	mu.computeNormalMatrix3x3();
+    // --- Draw buildings ---
+    for (int r = 0; r < rows; ++r) {
+        for (int c = 0; c < cols; ++c) {
+            if ((r + c) % 2 == 0) {
+                float x = offsetX + c * (10.0f + gap);
+                float z = offsetZ + r * (10.0f + gap);
 
-	data.meshID = 1;
-	data.texMode = 1;
-	data.vm = mu.get(gmu::VIEW_MODEL);
-	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-	data.normal = mu.getNormalMatrix();
-	renderer.renderMesh(data);
-	mu.popMatrix(gmu::MODEL);
+                mu.pushMatrix(gmu::MODEL);
+                mu.translate(gmu::MODEL, x, 0.0f, z);
+                mu.scale(gmu::MODEL, 10.0f, buildingHeights[r][c], 10.0f);
+                mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+                mu.computeNormalMatrix3x3();
 
-	for (int r = 0; r < rows; ++r) {
-		for (int c = 0; c < cols; ++c) {
-			// Checker pattern
-			if ((r + c) % 2 == 0) {
-				float x = offsetX + c * (10.0f + gap);
-            	float z = offsetZ + r * (10.0f + gap);
+                data.meshID = 1;
+                data.texMode = 3;
+                data.vm = mu.get(gmu::VIEW_MODEL);
+                data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+                data.normal = mu.getNormalMatrix();
+                renderer.renderMesh(data);
+                mu.popMatrix(gmu::MODEL);
+            }
+        }
+    }
 
-				mu.pushMatrix(gmu::MODEL);
-				mu.translate(gmu::MODEL, x, 0.0f, z);
-				//mu.scale(gmu::MODEL, buildings[1].width, buildingHeights[r][c],  buildings[1].depth);
-				mu.scale(gmu::MODEL, 10.0f, buildingHeights[r][c],  10.0f);
+    // --- Draw lamp posts ---
+    for (int i = 0; i < numLamps; ++i) {
+        float x = lampPositions[i].x;
+		float y = lampPositions[i].y;
+		float z = lampPositions[i].z;
 
-				mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-				mu.computeNormalMatrix3x3();
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, x, 0.0f, z);
+        mu.scale(gmu::MODEL, 0.3f, lampHeight, 0.3f);
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
 
-				data.meshID = 1;
-				data.texMode = 3;
-				data.vm = mu.get(gmu::VIEW_MODEL);
-				data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-				data.normal = mu.getNormalMatrix();
-				renderer.renderMesh(data);
+        data.meshID = 1;
+        data.texMode = 4;
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
 
-				mu.popMatrix(gmu::MODEL);
-			}
-		}
-	}
+        mu.popMatrix(gmu::MODEL);
+    }
 
-	for (int i = 0; i < numLamps; ++i) {
-		int r = i;
-		int c = i;
+    // --- Update third camera to follow drone ---
+    cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
+    cams[2].camPos[1] = drone.position[1] + followHeight;
+    cams[2].camPos[2] = drone.position[2] - drone.direction[2] * followDistance;
 
-		// Base position = diagonal cell
-		float x = offsetX + c * (10.0f + gap);  //buildingwidth
-		float z = offsetZ + r * (10.0f + gap); //buildngDepth
+    cams[2].camTarget[0] = drone.position[0];
+    cams[2].camTarget[1] = drone.position[1];
+    cams[2].camTarget[2] = drone.position[2];
 
-		// Shift lamps so they are beside the diagonal path, not inside the buildings
-		// Example: shift them a bit in +X direction
-		x += lampOffset;
-
-		// --- render pole ---
-		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, x, 0.0f, z);
-		mu.scale(gmu::MODEL, 0.3f, lampHeight, 0.3f);
-
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
-
-		data.meshID = 1; // lamppost mesh
-		data.texMode = 4;
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
-
-		mu.popMatrix(gmu::MODEL);
-	}
-
-
-	// Update third camera to follow drone CHECCKKKKKKKKKKK inside if statement para if tecla 3
-	cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
-	cams[2].camPos[1] = drone.position[1] + followHeight;
-	cams[2].camPos[2] = drone.position[2] - drone.direction[2] * followDistance;
-
-	cams[2].camTarget[0] = drone.position[0];
-	cams[2].camTarget[1] = drone.position[1];
-	cams[2].camTarget[2] = drone.position[2];
-
-
-	glutSwapBuffers();
+    glutSwapBuffers();
 }
 
 // ------------------------------------------------------------
@@ -443,10 +463,6 @@ void processKeys(unsigned char key, int xx, int yy)
 			glutLeaveMainLoop();
 			break;
 
-		case 'c': 
-			printf("Camera Spherical Coordinates (%f, %f, %f)\n", alpha, beta, r);
-			break;
-
 		case 'l':   //toggle spotlight mode
 			if (!spotlight_mode) {
 				spotlight_mode = true;
@@ -466,8 +482,22 @@ void processKeys(unsigned char key, int xx, int yy)
 			camY = r * sin(beta * 3.14f / 180.0f);
 			break; */
 
+		case 'c':   // toggle lamp posts
+			lampsOn = !lampsOn;
+			printf("Lamp posts %s\n", lampsOn ? "ON" : "OFF");
+			break;
+
+		case 'n':   // toggle day/night mode
+			dayMode = !dayMode;
+			if (dayMode)
+				printf("Day mode ON\n");
+			else
+				printf("Night mode ON\n");
+			break;
+
+
 		case 'm': glEnable(GL_MULTISAMPLE); break;
-		case 'n': glDisable(GL_MULTISAMPLE); break;
+		case 'p': glDisable(GL_MULTISAMPLE); break;
 		case '1':
 			activeCam = 0; 
 			break;
@@ -584,8 +614,6 @@ void buildScene()
 	renderer.TexObjArray.texture2D_Loader("assets/lightwood.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");  
 	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");  
-
-	
 
 	//Scene geometry with triangle meshes
 

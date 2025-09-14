@@ -2,13 +2,14 @@
 // The code comes with no warranties, use it at your own risk.
 // You may use it, or parts of it, wherever you want.
 // 
-// Author: João Madeiras Pereira
+// Author: Joï¿½o Madeiras Pereira
 //
 
 #include <vector>
 #include "texture.h"
 #include "model.h"
 #include "stb_truetype.h"
+#include "mathUtility.h"
 
 struct dataMesh {
   int meshID = 0;  //mesh ID in the myMeshes array
@@ -31,6 +32,10 @@ struct TextCommand {
     float color[4] = {1.f,1.f,1.f, 1.f};
     float *pvm;
     Align align_x = Align::Center, align_y = Align::Center;
+};
+
+struct Lamp {
+    float x, y, z;
 };
 
 class Renderer {
@@ -56,11 +61,13 @@ public:
 
   void setSpotParam(float *coneDir, float cutOff);
 
+  void setDirectionalLight(float* dir, float* color);
+
   void setSpotLightMode(bool spotLightMode);
 
   void setTexUnit(int tuId, int texObjId);
 
-
+  void setLampLights(const std::vector<Lamp>& lamps, gmu mu, bool lampsOn);
 
   //Vector with meshes
   std::vector<struct MyMesh> myMeshes;

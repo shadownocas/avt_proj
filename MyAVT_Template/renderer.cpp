@@ -221,6 +221,51 @@ void Renderer::setLightPos(float* lightPos) {
     glUniform4fv(lpos_loc, 1, lightPos);
 }
 
+void Renderer::setDirectionalLight(float* dir, float* color) {
+    GLint locDir = glGetUniformLocation(program, "dirLightDir");
+    glUniform3fv(locDir, 1, dir);
+
+    GLint locCol = glGetUniformLocation(program, "dirLightColor");
+    glUniform3fv(locCol, 1, color);
+}
+
+void Renderer::setLampLights(const std::vector<Lamp>& lamps, gmu mu, bool lampsOn) {
+    int numLamps = lamps.size();
+    std::vector<float> lampPositionsEye(4 * numLamps);
+    std::vector<float> lampDirs(4 * numLamps);
+
+    for (int i = 0; i < numLamps; i++) {
+        float worldPos[4] = {lamps[i].x, lamps[i].y, lamps[i].z, 1.0f};
+        float eyePos[4];
+        mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+
+        lampPositionsEye[i*4+0] = eyePos[0];
+        lampPositionsEye[i*4+1] = eyePos[1];
+        lampPositionsEye[i*4+2] = eyePos[2];
+        lampPositionsEye[i*4+3] = eyePos[3];
+
+        // Direction straight down
+        lampDirs[i*4+0] = 0.0f;
+        lampDirs[i*4+1] = -1.0f;
+        lampDirs[i*4+2] = 0.0f;
+        lampDirs[i*4+3] = 0.0f;
+    }
+
+    GLint locPos = glGetUniformLocation(program, "lampPos");
+    glUniform4fv(locPos, numLamps, lampPositionsEye.data());
+
+    GLint locDir = glGetUniformLocation(program, "lampDir");
+    glUniform4fv(locDir, numLamps, lampDirs.data());
+
+    GLint locCount = glGetUniformLocation(program, "numLamps");
+    glUniform1i(locCount, numLamps);
+
+    GLint locOn = glGetUniformLocation(program, "lampsOn");
+    glUniform1i(locOn, lampsOn ? 1 : 0);
+}
+
+
+
 void Renderer::setTexUnit(int tuId, int texObjId) {
     glActiveTexture(GL_TEXTURE0 + tuId);
     glBindTexture(GL_TEXTURE_2D, TexObjArray.getTextureId(texObjId));
