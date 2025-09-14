@@ -176,6 +176,8 @@ void changeSize(int w, int h) {
 	// Prevent a divide by zero, when window is too short
 	if(h == 0)
 		h = 1;
+	WinX = w;   //update globals
+    WinY = h;
 	// set the viewport to be the entire window
 	glViewport(0, 0, w, h);
 	// set the projection matrix
@@ -495,14 +497,17 @@ void renderSim(void) {
         mu.popMatrix(gmu::MODEL);
     }
 
-    // --- Update third camera to follow drone ---
-    cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
-    cams[2].camPos[1] = drone.position[1] + followHeight;
-    cams[2].camPos[2] = drone.position[2] - drone.direction[2] * followDistance;
+   // Camera position: fixed behind and above drone
+	cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
+	cams[2].camPos[1] = drone.position[1] + followHeight;
+	cams[2].camPos[2] = drone.position[2] - drone.direction[2] * followDistance;
 
-    cams[2].camTarget[0] = drone.position[0];
-    cams[2].camTarget[1] = drone.position[1];
-    cams[2].camTarget[2] = drone.position[2];
+	// Camera target: in front of the drone (not at the drone itself)
+	float lookAhead = 50.0f; // how far forward camera looks
+	cams[2].camTarget[0] = drone.position[0] + drone.direction[0] * lookAhead;
+	cams[2].camTarget[1] = drone.position[1];
+	cams[2].camTarget[2] = drone.position[2] + drone.direction[2] * lookAhead;
+
 
     glutSwapBuffers();
 }
@@ -527,10 +532,10 @@ void processKeys(unsigned char key, int xx, int yy)
 			glutLeaveMainLoop();
 			break;
 
-		case 'l':   //toggle spotlight mode
+		case 'h':   //toggle spotlight mode
 			if (!spotlight_mode) {
 				spotlight_mode = true;
-				printf("Point light disabled. Spot light enabled\n");
+				printf("Spot light disabled\n");
 			}
 			else {
 				spotlight_mode = false;
@@ -717,7 +722,7 @@ void buildScene()
 	
 	for (int r = 0; r < rows; ++r) {
 		for (int c = 0; c < cols; ++c) {
-			buildingHeights[r][c] = 5.0f + static_cast<float>(rand()) / RAND_MAX * 20.0f;
+			buildingHeights[r][c] = std::max((rand() % 20) + 5.0f, 10.0f);
 		}
 	}
 

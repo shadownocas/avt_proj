@@ -1,11 +1,11 @@
 ﻿  lightDemo.cpp
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(190,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(190,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(290,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(192,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(192,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(292,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(743,22): warning C4305: '=': truncation from 'double' to 'float'
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(746,22): warning C4305: '=': truncation from 'double' to 'float'
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(773,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(775,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(294,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(748,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(751,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(778,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(780,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
   MyAVT_Template.vcxproj -> C:\Users\iness\Documents\mestrado\avt\AVT_Proj\x64\Debug\MyAVT_Template.exe
   0 File(s) copied
