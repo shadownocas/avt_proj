@@ -1,31 +1,40 @@
 #version 430
 
-uniform mat4 m_pvm;
-uniform mat4 m_viewModel;
-uniform mat3 m_normal;
+// Uniforms
+uniform mat4 m_pvm;        // projection * view * model
+uniform mat4 m_viewModel;  // model -> eye space
+uniform mat3 m_normal;     // normal matrix (for transforming normals)
 
-
-uniform vec4 l_pos;
-
+// Vertex attributes
 in vec4 position;
-in vec4 normal;    //por causa do gerador de geometria
+in vec4 normal;    // from geometry generator
 in vec4 texCoord;
 
+// Output to fragment shader
 out Data {
-	vec3 normal;
-	vec3 eye;
-	vec3 lightDir;
-	vec2 tex_coord;
+    vec3 normal;    // normal in eye space
+    vec3 eye;       // vector toward camera (eye space)
+    vec3 posEye;    // position in eye space
+    vec2 tex_coord; // texture coordinates
 } DataOut;
 
-void main () {
+void main() {
+    // Transform vertex position to eye space
+    vec4 posEye4 = m_viewModel * position;
 
-	vec4 pos = m_viewModel * position;
+    // Output eye-space position
+    DataOut.posEye = posEye4.xyz;
 
-	DataOut.normal = normalize(m_normal * normal.xyz);
-	DataOut.lightDir = vec3(l_pos - pos);
-	DataOut.eye = vec3(-pos);
-	DataOut.tex_coord = texCoord.st;
+    // Transform normal to eye space
+    DataOut.normal = normalize(m_normal * normal.xyz);
 
-	gl_Position = m_pvm * position;	
+    // Compute vector toward camera (eye-space)
+    // Eye is at origin in eye space, so vector = -posEye
+    DataOut.eye = normalize(-posEye4.xyz);
+
+    // Pass through texture coordinates
+    DataOut.tex_coord = texCoord.st;
+
+    // Compute clip-space position for rasterization
+    gl_Position = m_pvm * position;
 }

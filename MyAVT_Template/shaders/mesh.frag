@@ -1,5 +1,5 @@
 #version 430
-#define MAX_LAMPS 16 
+#define MAX_LAMPS 7
 
 struct Materials {
     vec4 diffuse;
@@ -10,85 +10,149 @@ struct Materials {
     int texCount;
 };
 
+struct Attenuation {
+    float constant;
+    float linear;
+    float exp;
+};
+
+struct PointLight {
+    vec3 LocalPos;
+    Attenuation atten;
+    vec3 Color;
+};
+
+struct SpotLight {
+    vec3 Position;
+    vec3 Direction;
+    float Cutoff;
+    Attenuation atten;
+    vec3 Color;
+};
+
 in Data {
     vec3 normal;
-    vec3 eye;
-    vec3 lightDir;
+    vec3 eye;       // vector toward camera
+    vec3 posEye;    // position in eye space
     vec2 tex_coord;
 } DataIn;
 
 uniform Materials mat;
 
 // Texture samplers
-uniform sampler2D texmap;   // stone
-uniform sampler2D texmap1;  // checker
-uniform sampler2D texmap2;  // lightwood
-uniform sampler2D texmap3;  // bricks
-uniform sampler2D texmap4;  // metal
+uniform sampler2D texmap;   
+uniform sampler2D texmap1;  
+uniform sampler2D texmap2;  
+uniform sampler2D texmap3;  
+uniform sampler2D texmap4;  
 
-// Directional light (day/night)
-uniform vec3 dirLightDir;   // normalized
-uniform vec3 dirLightColor; // RGB intensity
+// Directional light
+uniform vec3 dirLightDir;   
+uniform vec3 dirLightColor; 
 
-// Spotlight
-uniform bool spotlight_mode;
-uniform vec4 coneDir;
-uniform float spotCosCutOff;
+// Point lights
+uniform int numLamps;
+uniform PointLight pointLights[MAX_LAMPS];
+uniform bool lampsOn;
 
-// Mesh
+// SpotLight
+uniform bool spotlightsOn;
+uniform SpotLight spotLights[2];
+
 uniform int texMode;
 
 out vec4 colorOut;
 
+// --- Phong for one light ---
+vec3 calcPhong(vec3 N, vec3 V, vec3 L, vec3 lightColor) {
+    float diff = max(dot(N, L), 0.0);
+    vec3 H = normalize(L + V);
+    float spec = pow(max(dot(N, H), 0.0), mat.shininess);
+    return diff * mat.diffuse.rgb * lightColor + spec * mat.specular.rgb * lightColor;
+}
+
+// --- Compute point light with attenuation ---
+vec3 calcPointLight(PointLight light, vec3 N, vec3 V, vec3 posEye) {
+    vec3 toLight = light.LocalPos - posEye;
+    float dist = length(toLight);
+    vec3 L = normalize(toLight);
+
+    float att = 1.0 / (light.atten.constant + light.atten.linear * dist + light.atten.exp * dist * dist);
+
+    return calcPhong(N, V, L, light.Color) * att;
+}
+
+vec3 calcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 posEye) {
+    vec3 toLight = light.Position - posEye;
+    float dist = length(toLight);
+    vec3 L = normalize(toLight);
+
+    // Spotlight factor: angle between light direction and vector to fragment
+    float spotFactor = dot(-L, normalize(light.Direction));
+    if (spotFactor < light.Cutoff) {
+        return vec3(0.0); // outside spotlight cone
+    }
+
+    // Attenuation
+    float att = 1.0 / (light.atten.constant + light.atten.linear * dist + light.atten.exp * dist * dist);
+
+    // Phong contribution
+    return calcPhong(N, V, L, light.Color) * att * spotFactor; // multiply by spotFactor for smooth edge
+}
+
+
 void main() {
-    vec3 n = normalize(DataIn.normal);
-    vec3 e = normalize(DataIn.eye);
-    vec3 l = normalize(DataIn.lightDir);
-    vec3 sd = normalize(coneDir.xyz);
+    vec3 N = normalize(DataIn.normal);
+    vec3 V = normalize(DataIn.eye); // eye-space view vector
+    vec3 intensity = mat.ambient.rgb; // start with ambient
 
-    vec4 texel = vec4(1.0);
-    vec4 spec = vec4(0.0);
-    float intensity = 0.0;
-    float intSpec = 0.0;
-    float att = 0.0;
-    float spotExp = 60.0;
+    // --- Directional light ---
+    vec3 Ldir = normalize(-dirLightDir);
+    intensity += calcPhong(N, V, Ldir, dirLightColor);
 
-    // --- Spotlight / Point Light ---
-    if(spotlight_mode) {
-        float spotCos = dot(-l, sd);
-        if (spotCos > spotCosCutOff) {
-            att = pow(spotCos, spotExp);
-            intensity = max(dot(n, l), 0.0) * att;
-            if (intensity > 0.0) {
-                vec3 h = normalize(l + e);
-                intSpec = max(dot(h, n), 0.0);
-                spec = mat.specular * pow(intSpec, mat.shininess) * att;
-            }
-        }
-    } else {
-        intensity = max(dot(n, l), 0.0);
-        if (intensity > 0.0) {
-            vec3 h = normalize(l + e);
-            intSpec = max(dot(h, n), 0.0);
-            spec = mat.specular * pow(intSpec, mat.shininess);
+    // --- Point lights ---
+    if (lampsOn) {
+        for (int i = 0; i < numLamps; ++i) {
+            intensity += calcPointLight(pointLights[i], N, V, DataIn.posEye);
         }
     }
 
-    // --- Directional light contribution ---
-    vec3 dirLight = normalize(-dirLightDir);
-    float diffDir = max(dot(n, dirLight), 0.0);
+	if (spotlightsOn) {
+		for (int i = 0; i < 2; ++i) {
+			intensity += calcSpotLight(spotLights[i], N, V, DataIn.posEye);
+		}
+	}
 
-    // --- Select texture ---
-    if (texMode == 1) texel = texture(texmap2, DataIn.tex_coord); // lightwood
-    else if (texMode == 2) texel = texture(texmap, DataIn.tex_coord); // stone
-    else if (texMode == 3) texel = texture(texmap3, DataIn.tex_coord); // bricks
-    else if (texMode == 4) texel = texture(texmap4, DataIn.tex_coord); // metal
+    // --- Texture application ---
+    vec4 texel, texel1;
+    vec4 spec = vec4(0.0);
 
-    // --- Combine lights with texture ---
-    vec3 finalColor = texel.rgb * (diffDir * dirLightColor + intensity * mat.diffuse.rgb) + spec.rgb;
-
-    // --- Add minimal ambient contribution ---
-    finalColor = max(finalColor, mat.ambient.rgb + 0.07 * texel.rgb);
-
-    colorOut = vec4(finalColor, 1.0);
+    if (texMode == 0)
+        colorOut = vec4(max(intensity * mat.diffuse.rgb + spec.rgb, mat.ambient.rgb), 1.0);
+    else if (texMode == 1) {
+        texel = texture(texmap2, DataIn.tex_coord);
+        vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
+    else if (texMode == 2) {
+        texel = texture(texmap, DataIn.tex_coord);
+        vec3 finalColor = max(intensity * texel.rgb + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
+    else if (texMode == 3) {
+        texel = texture(texmap3, DataIn.tex_coord);
+        vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
+    else if (texMode == 4) {
+        texel = texture(texmap4, DataIn.tex_coord);
+        vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
+    else {
+        texel = texture(texmap2, DataIn.tex_coord);
+        texel1 = texture(texmap1, DataIn.tex_coord);
+        vec3 finalColor = max(intensity * texel.rgb * texel1.rgb + spec.rgb, 0.07 * texel.rgb * texel1.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
 }

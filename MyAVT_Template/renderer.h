@@ -35,8 +35,30 @@ struct TextCommand {
 };
 
 struct Lamp {
-    float x, y, z;
+  float x, y, z;
+  float w = 1.0f; 
 };
+
+struct Attenuation {
+    float constant;
+    float linear;
+    float exp;
+};
+
+struct PointLight {
+    float LocalPos[3]; // eye-space position
+    Attenuation atten;
+    float Color[3];    // RGB
+};
+
+struct SpotLight {
+    float Position[3];    // eye-space position
+    float Direction[3];   // normalized direction in eye space
+    float Cutoff;     // cosine of the cone angle
+    Attenuation atten;
+    float Color[3];
+};
+
 
 class Renderer {
 public:
@@ -67,7 +89,9 @@ public:
 
   void setTexUnit(int tuId, int texObjId);
 
-  void setLampLights(const std::vector<Lamp>& lamps, gmu mu, bool lampsOn);
+  void setLampLights(const std::vector<PointLight> &pointLights, bool lampsOn);
+
+  void setDroneSpotLights(SpotLight* lights, int count, bool enabled);
 
   //Vector with meshes
   std::vector<struct MyMesh> myMeshes;

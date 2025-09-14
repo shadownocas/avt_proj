@@ -229,39 +229,56 @@ void Renderer::setDirectionalLight(float* dir, float* color) {
     glUniform3fv(locCol, 1, color);
 }
 
-void Renderer::setLampLights(const std::vector<Lamp>& lamps, gmu mu, bool lampsOn) {
-    int numLamps = lamps.size();
-    std::vector<float> lampPositionsEye(4 * numLamps);
-    std::vector<float> lampDirs(4 * numLamps);
+void Renderer::setLampLights(const std::vector<PointLight> &pointLights, bool lampsOn)
+{
+    glUseProgram(program); // make sure the shader is active
 
-    for (int i = 0; i < numLamps; i++) {
-        float worldPos[4] = {lamps[i].x, lamps[i].y, lamps[i].z, 1.0f};
-        float eyePos[4];
-        mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+    // 1️⃣ Number of lamps
+    GLint locNum = glGetUniformLocation(program, "numLamps");
+    glUniform1i(locNum, (GLint)pointLights.size());
 
-        lampPositionsEye[i*4+0] = eyePos[0];
-        lampPositionsEye[i*4+1] = eyePos[1];
-        lampPositionsEye[i*4+2] = eyePos[2];
-        lampPositionsEye[i*4+3] = eyePos[3];
-
-        // Direction straight down
-        lampDirs[i*4+0] = 0.0f;
-        lampDirs[i*4+1] = -1.0f;
-        lampDirs[i*4+2] = 0.0f;
-        lampDirs[i*4+3] = 0.0f;
-    }
-
-    GLint locPos = glGetUniformLocation(program, "lampPos");
-    glUniform4fv(locPos, numLamps, lampPositionsEye.data());
-
-    GLint locDir = glGetUniformLocation(program, "lampDir");
-    glUniform4fv(locDir, numLamps, lampDirs.data());
-
-    GLint locCount = glGetUniformLocation(program, "numLamps");
-    glUniform1i(locCount, numLamps);
-
+    // 2️⃣ On/off toggle
     GLint locOn = glGetUniformLocation(program, "lampsOn");
     glUniform1i(locOn, lampsOn ? 1 : 0);
+
+    // 3️⃣ Loop through all point lights
+    for (size_t i = 0; i < pointLights.size(); ++i)
+    {
+        std::string base = "pointLights[" + std::to_string(i) + "]";
+
+        GLint locPos = glGetUniformLocation(program, (base + ".LocalPos").c_str());
+        GLint locColor = glGetUniformLocation(program, (base + ".Color").c_str());
+        GLint locAttenC = glGetUniformLocation(program, (base + ".atten.constant").c_str());
+        GLint locAttenL = glGetUniformLocation(program, (base + ".atten.linear").c_str());
+        GLint locAttenE = glGetUniformLocation(program, (base + ".atten.exp").c_str());
+
+        glUniform3fv(locPos, 1, pointLights[i].LocalPos);
+        glUniform3fv(locColor, 1, pointLights[i].Color);
+        glUniform1f(locAttenC, pointLights[i].atten.constant);
+        glUniform1f(locAttenL, pointLights[i].atten.linear);
+        glUniform1f(locAttenE, pointLights[i].atten.exp);
+    }
+}
+
+void Renderer::setDroneSpotLights(SpotLight* lights, int count, bool enabled) {
+    // Tell the shader if spotlights are on
+    GLint loc = glGetUniformLocation(program, "spotlightsOn");
+    glUniform1i(loc, enabled ? 1 : 0);
+
+    for(int i = 0; i < count; ++i) {
+        std::string base = "spotLights[" + std::to_string(i) + "]";
+        glUniform3fv(glGetUniformLocation(program, (base + ".Position").c_str()), 1, lights[i].Position);
+        glUniform3fv(glGetUniformLocation(program, (base + ".Direction").c_str()), 1, lights[i].Direction);
+        glUniform3fv(glGetUniformLocation(program, (base + ".Color").c_str()), 1, lights[i].Color);
+        glUniform1f(glGetUniformLocation(program, (base + ".Cutoff").c_str()), lights[i].Cutoff);
+
+        glUniform1f(glGetUniformLocation(program, (base + ".atten.constant").c_str()), lights[i].atten.constant);
+        glUniform1f(glGetUniformLocation(program, (base + ".atten.linear").c_str()), lights[i].atten.linear);
+        glUniform1f(glGetUniformLocation(program, (base + ".atten.exp").c_str()), lights[i].atten.exp);
+    }
+
+    // send number of spotlights
+    //glUniform1i(glGetUniformLocation(program, "numSpotLights"), count);
 }
 
 

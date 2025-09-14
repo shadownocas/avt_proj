@@ -69,8 +69,9 @@ struct FlyingObject {
     bool active;
 };
 
-std::vector<FlyingObject> flyingObjects;
+std::vector<PointLight> pointLights;
 
+std::vector<FlyingObject> flyingObjects;
 
 Drone drone;
 float droneSpeed = 0.2f;       // units per frame
@@ -91,7 +92,6 @@ int activeCam = 0;
 bool lampsOn = true; // all lamps initially on
 
 std::vector<Lamp> lampPositions;
-
 
 // Mouse Tracking Variables
 int startX, startY, tracking = 0;
@@ -115,6 +115,8 @@ float lightPos[4] = {4.0f, 20.0f, 2.0f, 1.0f};
 //Spotlight
 bool spotlight_mode = false;
 float coneDir[4] = { 0.0f, -0.0f, -1.0f, 0.0f };
+
+SpotLight droneHeadlights[2]; // two headlights
 
 int rows = 7;           // number of rows
 int cols = 7;           // number of columns
@@ -238,6 +240,7 @@ void updateCamera(){
 		mu.ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, -500.0f, 500.0f);
 	}
 }
+
 void renderSim(void) {
 
     FrameCount++;
@@ -258,13 +261,15 @@ void renderSim(void) {
     // --- Set camera/view ---
     mu.loadIdentity(gmu::VIEW);
     mu.loadIdentity(gmu::MODEL);
-    mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
-              cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0,1,0);
 
     // --- Light positions ---
     float lposAux[4];
     mu.multMatrixPoint(gmu::VIEW, lightPos, lposAux);   
     renderer.setLightPos(lposAux);
+
+	// Spotlight settings
+    //renderer.setSpotLightMode(spotlight_mode);
+    //renderer.setSpotParam(coneDir, 2.0f);
 
 	// ----- UPDATE FLYING OBJECTS -----
 	for (auto &obj : flyingObjects) {
@@ -296,15 +301,9 @@ void renderSim(void) {
 		}
 	}
 
-	// load identity matrices
-	mu.loadIdentity(gmu::VIEW);
-	mu.loadIdentity(gmu::MODEL);
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
 	cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0,1,0);
-    // Spotlight settings
-    renderer.setSpotLightMode(spotlight_mode);
-    renderer.setSpotParam(coneDir, 2.0f);
 
     // Directional light
     float dirLightWorld[4] = { 0.5f, -0.7f, 0.3f, 0.0f };
@@ -320,18 +319,88 @@ void renderSim(void) {
     }
     renderer.setDirectionalLight(dirLightEye3, lightColor);
 
-    // --- Build lamp positions before sending to shader ---
-    lampPositions.clear();
-    for (int i = 0; i < numLamps; ++i) {
-        int r = i;
-        int c = i;
-        float x = offsetX + c * (10.0f + gap) + lampOffset;
-        float z = offsetZ + r * (10.0f + gap);
-        float y = lampHeight;
-        lampPositions.push_back({x, y, z});
-    }
-	// Send lamp data to shader
-    renderer.setLampLights(lampPositions, mu, lampsOn);
+	pointLights.clear();
+	for (int i = 0; i < numLamps; ++i) {
+		float x = offsetX + i * (10.0f + gap) + lampOffset;
+		float z = offsetZ + i * (10.0f + gap);
+		float y = lampHeight + 3.0f;
+		// 1️⃣ Define world-space position of the lamp
+		float worldPos[4] = { x, y, z, 1.0f };
+
+		// 2️⃣ Convert to eye space using your mu helper
+		float eyePos[4];
+		mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos); // eyePos now contains the lamp in eye space
+
+		PointLight lamp;
+		lamp.LocalPos[0] = eyePos[0];
+		lamp.LocalPos[1] = eyePos[1];
+		lamp.LocalPos[2] = eyePos[2];
+		lamp.Color[0] = 1.0f;  // warm lamp color
+		lamp.Color[1] = 0.9f;
+		lamp.Color[2] = 0.7f;
+		lamp.atten.constant = 1.0f;
+		lamp.atten.linear   = 0.1f;
+		lamp.atten.exp      = 0.01f;
+
+		pointLights.push_back(lamp);
+	}
+
+	renderer.setLampLights(pointLights, lampsOn);
+
+	float headlightOffsetX = 0.5f;  // left/right from drone center
+float headlightOffsetY = -0.2f; // slightly below drone center
+float headlightForward = 1.0f;  // forward along drone
+
+for (int i = 0; i < 2; ++i) {
+    float offsetX = (i == 0) ? -headlightOffsetX : headlightOffsetX;
+
+    // World-space position of the headlight
+    float worldPos[4] = {
+        drone.position[0] + offsetX,
+        drone.position[1] + headlightOffsetY,
+        drone.position[2] + headlightForward,
+        1.0f
+    };
+
+    // Rotate around Y based on drone yaw
+    float yaw = atan2(-drone.direction[2], drone.direction[0]);
+    float cosYaw = cos(yaw);
+    float sinYaw = sin(yaw);
+    float relX = worldPos[0] - drone.position[0];
+    float relZ = worldPos[2] - drone.position[2];
+    worldPos[0] = drone.position[0] + relX * cosYaw - relZ * sinYaw;
+    worldPos[2] = drone.position[2] + relX * sinYaw + relZ * cosYaw;
+
+    // Convert position to eye space
+    float eyePos[4];
+    mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+
+    // Set position
+    droneHeadlights[i].Position[0] = eyePos[0];
+    droneHeadlights[i].Position[1] = eyePos[1];
+    droneHeadlights[i].Position[2] = eyePos[2];
+
+    // Direction is drone forward vector in eye space
+    float worldDir[4] = { drone.direction[0], drone.direction[1], drone.direction[2], 0.0f };
+    float eyeDir[4];
+    mu.multMatrixPoint(gmu::VIEW, worldDir, eyeDir);
+    droneHeadlights[i].Direction[0] = eyeDir[0];
+    droneHeadlights[i].Direction[1] = eyeDir[1];
+    droneHeadlights[i].Direction[2] = eyeDir[2];
+
+    droneHeadlights[i].Color[0] = 1.0f;
+    droneHeadlights[i].Color[1] = 1.0f;
+    droneHeadlights[i].Color[2] = 0.9f;
+    droneHeadlights[i].atten.constant = 1.0f;
+    droneHeadlights[i].atten.linear = 0.1f;
+    droneHeadlights[i].atten.exp = 0.01f;
+    droneHeadlights[i].Cutoff = cosf(20.0f * 3.14159f / 180.0f); // 20 deg cone
+}
+
+	renderer.setDroneSpotLights(droneHeadlights, 2, spotlight_mode);
+
+
+
 
 	dataMesh data;
 
@@ -411,9 +480,8 @@ void renderSim(void) {
 
     // --- Draw lamp posts ---
     for (int i = 0; i < numLamps; ++i) {
-        float x = lampPositions[i].x;
-		float y = lampPositions[i].y;
-		float z = lampPositions[i].z;
+        float x = offsetX + i * (10.0f + gap) + lampOffset;
+		float z = offsetZ + i * (10.0f + gap);
 
         mu.pushMatrix(gmu::MODEL);
         mu.translate(gmu::MODEL, x, 0.0f, z);
