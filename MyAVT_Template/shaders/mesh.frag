@@ -45,6 +45,8 @@ uniform sampler2D texmap1;
 uniform sampler2D texmap2;  
 uniform sampler2D texmap3;  
 uniform sampler2D texmap4;  
+uniform sampler2D texmap5;  
+uniform sampler2D texmap6;  
 
 // Directional light
 uniform vec3 dirLightDir;   
@@ -146,6 +148,16 @@ void main() {
     }
     else if (texMode == 4) {
         texel = texture(texmap4, DataIn.tex_coord);
+        vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
+    else if (texMode == 5) {
+        texel = texture(texmap5, DataIn.tex_coord);
+        vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
+     else if (texMode == 6) {
+        texel = texture(texmap6, DataIn.tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
     }

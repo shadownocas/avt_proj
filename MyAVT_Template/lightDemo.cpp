@@ -107,7 +107,9 @@ char s[32];
 bool dayMode = true;                 // Day/night toggle
 float dirLightDir[3] = { -0.5f, -1.0f, -0.3f };  // Direction of sunlight
 float dirLightColor[3] = { 1.0f, 1.0f, 0.9f };   // Day color
-float nightLightColor[3] = { 0.1f, 0.1f, 0.2f }; // Night ambient color
+//float nightLightColor[3] = { 0.1f, 0.1f, 0.2f }; // Night ambient color
+float nightLightColor[3] = { 0.0f, 0.0f, 0.0f };
+
 
 float lightPos[4] = {4.0f, 20.0f, 2.0f, 1.0f};
 //float lightPos[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -142,18 +144,18 @@ std::vector<std::vector<float>> buildingHeights(rows, std::vector<float>(cols));
 
 float buildingW = 10.0f;
 float buildingD = 10.0f;
-float streetWidth = 6.0f;    // largura da rua
+float streetWidth = 30.0f;    // largura da rua
 float sidewalk = 2.0f;       // passeios
 
 // central garden define: ocupa N x M células no centro
-int gardenSizeRows = 2; // 2x2 cells
+int gardenSizeRows = 3; // 2x2 cells
 int gardenSizeCols = 3;
 
 float gardenHalfW = (gardenSizeCols * (buildingW + gap) - gap) / 2.0f;
 float gardenHalfD = (gardenSizeRows * (buildingD + gap) - gap) / 2.0f;
 
-float gardenCenterX = 0.0f; // because grid centered with offsetX/offsetZ
-float gardenCenterZ = 0.0f;
+float gardenCenterX = 6.0f; // because grid centered with offsetX/offsetZ
+float gardenCenterZ = 5.0f;
 float gardenW = gardenHalfW * 2.0f;
 float gardenD = gardenHalfD * 2.0f;
 
@@ -223,6 +225,7 @@ void dronePosition(){
 		drone.position[2] += drone.direction[2] * droneSpeed;
 	}
 	if (keyStates['s']){
+		printf("drone andou??\n");
 		drone.position[0] -= drone.direction[0] * droneSpeed;
 		drone.position[2] -= drone.direction[2] * droneSpeed;
 	}
@@ -273,6 +276,8 @@ void renderSim(void) {
     renderer.setTexUnit(2, 2);
     renderer.setTexUnit(3, 3);
     renderer.setTexUnit(4, 4);
+	renderer.setTexUnit(5, 5);
+	renderer.setTexUnit(6, 6);
 
     // Update drone movement
     dronePosition();
@@ -322,21 +327,14 @@ void renderSim(void) {
     float dirLightEye[4];
     mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
     float dirLightEye3[3] = { dirLightEye[0], dirLightEye[1], dirLightEye[2] };
-
-    float lightColor[3] = {1.0f, 1.0f, 0.9f};
-    if(!dayMode) {
-        lightColor[0] = 0.1f; 
-        lightColor[1] = 0.1f; 
-        lightColor[2] = 0.2f;
-    }
-    renderer.setDirectionalLight(dirLightEye3, lightColor);
+	renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
 
 	dataMesh data;
 
 	pointLights.clear();
-	std::vector<float> lampWorldCoords;
+
 	int lampCount = 6;
-	float lampRadius = std::max(gardenW, gardenD) / 2.0f + 2.0f; // postes ligeiramente fora do jardim
+	float lampRadius = std::max(gardenW, gardenD) / 2.0f; // postes ligeiramente fora do jardim
 
 	for (int i = 0; i < lampCount; ++i) {
 		float ang = (2.0f * 3.14159f) * i / lampCount;
@@ -362,7 +360,7 @@ void renderSim(void) {
 
 		//LampPost
 		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, lx, ly/2.0f, lz);
+		mu.translate(gmu::MODEL, lx, 0, lz);
 		mu.scale(gmu::MODEL, 0.25f, ly, 0.25f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
@@ -376,11 +374,11 @@ void renderSim(void) {
 
 		// and small emissive sphere at top as bulb
 		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, lx, ly + 0.6f, lz);
+		mu.translate(gmu::MODEL, lx, ly, lz);
 		mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
-		data.meshID = 1; // sphere mesh
+		data.meshID = 2; // sphere mesh
 		data.texMode = 2;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -492,70 +490,72 @@ void renderSim(void) {
     mu.popMatrix(gmu::MODEL);
 
 	// --- Draw streets (as long quads with asphalt texture) ---
-	mu.pushMatrix(gmu::MODEL);
+	/* mu.pushMatrix(gmu::MODEL);
 	{   // vertical street (central column)
 		float streetLenZ = rows * (buildingD + gap);
 		mu.translate(gmu::MODEL, 0.0f, 0.01f, 0.0f); // slightly above floor
-		mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f); //AHHHH
+		mu.rotate(gmu::MODEL, 90.0f, 0.0f, 1.0f, 0.0f);
+		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
 		mu.scale(gmu::MODEL, streetWidth, 1.0f, streetLenZ);
+		//mu.rotate(gmu::MODEL, -90.0f, 0.0f, 0.0f, 1.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 		data.meshID = 0;        // quad mesh
-		data.texMode = 2;      // texture unit 0 -> asphalt / stone.tga
+		data.texMode = 6;      // texture unit 0 -> asphalt / stone.tga
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
 		renderer.renderMesh(data);
 		mu.loadIdentity(gmu::MODEL);
 	}
-	mu.popMatrix(gmu::MODEL);
+	mu.popMatrix(gmu::MODEL); */
 
-	// horizontal street
+	// horizontal street/road
 	mu.pushMatrix(gmu::MODEL);
 	{
 		float streetLenX = cols * (buildingW + gap);
-		mu.translate(gmu::MODEL, 0.0f, 0.01f, 0.0f);
-		mu.rotate(gmu::MODEL, 90.0f, 0,1,0); // rotate quad to be X length
+		mu.translate(gmu::MODEL, 5.0f, 0.2f, 0.0f);
 		mu.scale(gmu::MODEL, streetWidth, 1.0f, streetLenX);
+		mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 		data.meshID = 0;
-		data.texMode = 2;
+		data.texMode = 6;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
 		renderer.renderMesh(data);
 		mu.loadIdentity(gmu::MODEL);
 	}
-	mu.popMatrix(gmu::MODEL);
+	mu.popMatrix(gmu::MODEL); 
 
 	// --- Draw garden (central park) ---
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
-	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f); //AHHHHHHHH
 	mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
+	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f); //AHHHHHHHH
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 	mu.computeNormalMatrix3x3();
 	data.meshID = 0;
-	data.texMode = 2;
+	data.texMode = 5;
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
 	renderer.renderMesh(data);
 	mu.popMatrix(gmu::MODEL);
-
+ 
 	// place some low 'tree' cones around garden
 	for (int t = 0; t < 6; ++t) {
 		float ang = (2.0f * 3.14159f) * t / 6.0f;
-		float rx = gardenCenterX + (gardenW/2.0f - 2.0f) * cos(ang);
-		float rz = gardenCenterZ + (gardenD/2.0f - 2.0f) * sin(ang);
+		float rx = gardenCenterX + (gardenW/2.2f - 4.0f) * cos(ang);
+		float rz = gardenCenterZ + (gardenD/2.2f - 4.0f) * sin(ang);
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, rx, 0, rz);
 		mu.scale(gmu::MODEL, 1.5f, 4.0f, 1.5f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 		data.meshID = 3; // cone mesh
-		data.texMode = 3;
+		data.texMode = 5;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -582,7 +582,6 @@ void renderSim(void) {
 		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
 	}
-
 
    // Camera position: fixed behind and above drone
 	cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
@@ -762,6 +761,8 @@ void buildScene()
 	renderer.TexObjArray.texture2D_Loader("assets/lightwood.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");  
 	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");  
+	renderer.TexObjArray.texture2D_Loader("assets/grass.tga");  
+	renderer.TexObjArray.texture2D_Loader("assets/road.tga"); 
 
 	//Scene geometry with triangle meshes
 
@@ -895,8 +896,6 @@ void buildScene()
 			}
 		}
 	}
-
-
 }
 
 // ------------------------------------------------------------

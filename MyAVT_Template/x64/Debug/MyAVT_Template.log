@@ -1,11 +1,11 @@
 ﻿  lightDemo.cpp
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(212,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(212,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(304,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(306,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(817,22): warning C4305: '=': truncation from 'double' to 'float'
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(820,22): warning C4305: '=': truncation from 'double' to 'float'
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(847,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(849,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(307,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(309,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(812,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(815,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(842,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(844,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
   MyAVT_Template.vcxproj -> C:\Users\iness\Documents\mestrado\avt\AVT_Proj\x64\Debug\MyAVT_Template.exe
   0 File(s) copied
