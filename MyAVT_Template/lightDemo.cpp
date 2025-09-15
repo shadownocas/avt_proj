@@ -134,10 +134,28 @@ bool fontLoaded = false;
 struct Building {
     float x, z;
     float width, depth;
+	int row, col;    // indices no grid
 };
 
 std::vector<Building> buildings;
 std::vector<std::vector<float>> buildingHeights(rows, std::vector<float>(cols));
+
+float buildingW = 10.0f;
+float buildingD = 10.0f;
+float streetWidth = 6.0f;    // largura da rua
+float sidewalk = 2.0f;       // passeios
+
+// central garden define: ocupa N x M células no centro
+int gardenSizeRows = 2; // 2x2 cells
+int gardenSizeCols = 3;
+
+float gardenHalfW = (gardenSizeCols * (buildingW + gap) - gap) / 2.0f;
+float gardenHalfD = (gardenSizeRows * (buildingD + gap) - gap) / 2.0f;
+
+float gardenCenterX = 0.0f; // because grid centered with offsetX/offsetZ
+float gardenCenterZ = 0.0f;
+float gardenW = gardenHalfW * 2.0f;
+float gardenD = gardenHalfD * 2.0f;
 
 bool checkOverlap(const Building& a, const Building& b, float buffer = 1.0f) {
     return !(a.x + a.width/2 + buffer < b.x - b.width/2 ||
@@ -264,14 +282,6 @@ void renderSim(void) {
     mu.loadIdentity(gmu::VIEW);
     mu.loadIdentity(gmu::MODEL);
 
-    // --- Light positions ---
-    float lposAux[4];
-    mu.multMatrixPoint(gmu::VIEW, lightPos, lposAux);   
-    renderer.setLightPos(lposAux);
-
-	// Spotlight settings
-    //renderer.setSpotLightMode(spotlight_mode);
-    //renderer.setSpotParam(coneDir, 2.0f);
 
 	// ----- UPDATE FLYING OBJECTS -----
 	for (auto &obj : flyingObjects) {
@@ -321,35 +331,68 @@ void renderSim(void) {
     }
     renderer.setDirectionalLight(dirLightEye3, lightColor);
 
-	pointLights.clear();
-	for (int i = 0; i < numLamps; ++i) {
-		float x = offsetX + i * (10.0f + gap) + lampOffset;
-		float z = offsetZ + i * (10.0f + gap);
-		float y = lampHeight + 3.0f;
-		// 1️⃣ Define world-space position of the lamp
-		float worldPos[4] = { x, y, z, 1.0f };
+	dataMesh data;
 
-		// 2️⃣ Convert to eye space using your mu helper
+	pointLights.clear();
+	std::vector<float> lampWorldCoords;
+	int lampCount = 6;
+	float lampRadius = std::max(gardenW, gardenD) / 2.0f + 2.0f; // postes ligeiramente fora do jardim
+
+	for (int i = 0; i < lampCount; ++i) {
+		float ang = (2.0f * 3.14159f) * i / lampCount;
+		float lx = gardenCenterX + lampRadius * cos(ang);
+		float lz = gardenCenterZ + lampRadius * sin(ang);
+		float ly = lampHeight;
+
+		float worldPos[4] = { lx, ly, lz, 1.0f };
 		float eyePos[4];
-		mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos); // eyePos now contains the lamp in eye space
+		mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
 
 		PointLight lamp;
 		lamp.LocalPos[0] = eyePos[0];
 		lamp.LocalPos[1] = eyePos[1];
 		lamp.LocalPos[2] = eyePos[2];
-		lamp.Color[0] = 1.0f;  // warm lamp color
+		lamp.Color[0] = 1.0f;
 		lamp.Color[1] = 0.9f;
 		lamp.Color[2] = 0.7f;
 		lamp.atten.constant = 1.0f;
-		lamp.atten.linear   = 0.1f;
-		lamp.atten.exp      = 0.01f;
-
+		lamp.atten.linear   = 0.09f;
+		lamp.atten.exp      = 0.02f;
 		pointLights.push_back(lamp);
-	}
 
+		//LampPost
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, lx, ly/2.0f, lz);
+		mu.scale(gmu::MODEL, 0.25f, ly, 0.25f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+		data.meshID = 1; // cube
+		data.texMode = 4; // metal
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+
+		// and small emissive sphere at top as bulb
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, lx, ly + 0.6f, lz);
+		mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+		data.meshID = 1; // sphere mesh
+		data.texMode = 2;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+
+		// set emissive on mesh material somehow (if renderer supports per-mesh emissive)
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+	}
 	renderer.setLampLights(pointLights, lampsOn);
 
-		// --- Headlight offsets in LOCAL space of the cube ---
+	// --- Headlight offsets in LOCAL space of the cube ---
 	float localHeadlightOffsets[2][4] = {
 		{ -0.5f,  0.0f,  1.0f, 1.0f },  // left headlight
 		{  0.5f,  0.0f,  1.0f, 1.0f }   // right headlight
@@ -396,11 +439,7 @@ void renderSim(void) {
 	}
 	mu.popMatrix(gmu::MODEL);
 
-
 	renderer.setDroneSpotLights(droneHeadlights, 2, spotlight_mode);
-
-
-	dataMesh data;
 
 		// ----- RENDER FLYING OBJECTS -----
 	for (auto &obj : flyingObjects) {
@@ -452,50 +491,98 @@ void renderSim(void) {
     renderer.renderMesh(data);
     mu.popMatrix(gmu::MODEL);
 
-    // --- Draw buildings ---
-    for (int r = 0; r < rows; ++r) {
-        for (int c = 0; c < cols; ++c) {
-            if ((r + c) % 2 == 0) {
-                float x = offsetX + c * (10.0f + gap);
-                float z = offsetZ + r * (10.0f + gap);
+	// --- Draw streets (as long quads with asphalt texture) ---
+	mu.pushMatrix(gmu::MODEL);
+	{   // vertical street (central column)
+		float streetLenZ = rows * (buildingD + gap);
+		mu.translate(gmu::MODEL, 0.0f, 0.01f, 0.0f); // slightly above floor
+		mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f); //AHHHH
+		mu.scale(gmu::MODEL, streetWidth, 1.0f, streetLenZ);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+		data.meshID = 0;        // quad mesh
+		data.texMode = 2;      // texture unit 0 -> asphalt / stone.tga
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+		mu.loadIdentity(gmu::MODEL);
+	}
+	mu.popMatrix(gmu::MODEL);
 
-                mu.pushMatrix(gmu::MODEL);
-                mu.translate(gmu::MODEL, x, 0.0f, z);
-                mu.scale(gmu::MODEL, 10.0f, buildingHeights[r][c], 10.0f);
-                mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-                mu.computeNormalMatrix3x3();
+	// horizontal street
+	mu.pushMatrix(gmu::MODEL);
+	{
+		float streetLenX = cols * (buildingW + gap);
+		mu.translate(gmu::MODEL, 0.0f, 0.01f, 0.0f);
+		mu.rotate(gmu::MODEL, 90.0f, 0,1,0); // rotate quad to be X length
+		mu.scale(gmu::MODEL, streetWidth, 1.0f, streetLenX);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+		data.meshID = 0;
+		data.texMode = 2;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+		mu.loadIdentity(gmu::MODEL);
+	}
+	mu.popMatrix(gmu::MODEL);
 
-                data.meshID = 1;
-                data.texMode = 3;
-                data.vm = mu.get(gmu::VIEW_MODEL);
-                data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-                data.normal = mu.getNormalMatrix();
-                renderer.renderMesh(data);
-                mu.popMatrix(gmu::MODEL);
-            }
-        }
-    }
+	// --- Draw garden (central park) ---
+	mu.pushMatrix(gmu::MODEL);
+	mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
+	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f); //AHHHHHHHH
+	mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
+	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+	mu.computeNormalMatrix3x3();
+	data.meshID = 0;
+	data.texMode = 2;
+	data.vm = mu.get(gmu::VIEW_MODEL);
+	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+	data.normal = mu.getNormalMatrix();
+	renderer.renderMesh(data);
+	mu.popMatrix(gmu::MODEL);
 
-    // --- Draw lamp posts ---
-    for (int i = 0; i < numLamps; ++i) {
-        float x = offsetX + i * (10.0f + gap) + lampOffset;
-		float z = offsetZ + i * (10.0f + gap);
+	// place some low 'tree' cones around garden
+	for (int t = 0; t < 6; ++t) {
+		float ang = (2.0f * 3.14159f) * t / 6.0f;
+		float rx = gardenCenterX + (gardenW/2.0f - 2.0f) * cos(ang);
+		float rz = gardenCenterZ + (gardenD/2.0f - 2.0f) * sin(ang);
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, rx, 0, rz);
+		mu.scale(gmu::MODEL, 1.5f, 4.0f, 1.5f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+		data.meshID = 3; // cone mesh
+		data.texMode = 3;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+	}
 
-        mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, x, 0.0f, z);
-        mu.scale(gmu::MODEL, 0.3f, lampHeight, 0.3f);
-        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-        mu.computeNormalMatrix3x3();
+	// --- Draw buildings using buildings vector ---
+	for (const Building &b : buildings) {
+		float h = buildingHeights[b.row][b.col]; 
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, b.x, 0, b.z);
 
-        data.meshID = 1;
-        data.texMode = 4;
-        data.vm = mu.get(gmu::VIEW_MODEL);
-        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-        data.normal = mu.getNormalMatrix();
-        renderer.renderMesh(data);
+		mu.scale(gmu::MODEL, b.width, h, b.depth);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
 
-        mu.popMatrix(gmu::MODEL);
-    }
+		data.meshID = 1;
+		data.texMode = 3;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+	}
+
 
    // Camera position: fixed behind and above drone
 	cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
@@ -542,14 +629,6 @@ void processKeys(unsigned char key, int xx, int yy)
 				printf("Spot light disabled. Point light enabled\n");
 			}
 			break;
-
-		/* case 'r':    //reset
-			alpha = 57.0f; beta = 18.0f;  // Camera Spherical Coordinates
-			r = 45.0f;
-			camX = r * sin(alpha * 3.14f / 180.0f) * cos(beta * 3.14f / 180.0f);
-			camZ = r * cos(alpha * 3.14f / 180.0f) * cos(beta * 3.14f / 180.0f);
-			camY = r * sin(beta * 3.14f / 180.0f);
-			break; */
 
 		case 'c':   // toggle lamp posts
 			lampsOn = !lampsOn;
@@ -719,30 +798,14 @@ void buildScene()
 	amesh.mat.texCount = texcount;
 	renderer.myMeshes.push_back(amesh);
 
-	
-	for (int r = 0; r < rows; ++r) {
-		for (int c = 0; c < cols; ++c) {
-			buildingHeights[r][c] = std::max((rand() % 20) + 5.0f, 10.0f);
-		}
-	}
-
-
-
-	printf("\nNumber of Texture Objects is %d\n\n", renderer.TexObjArray.getNumTextureObjects());
-
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
 	drone.position[2] = -20.0f;
 
-	// For example, pointing along negative z axis initially
 	drone.direction[0] = 0.0f;
 	drone.direction[1] = 0.0f;
 	drone.direction[2] = -1.0f;
 
-	// set the camera position based on its spherical coordinates
-	/* camX = r * sin(alpha * 3.14f / 180.0f) * cos(beta * 3.14f / 180.0f);
-	camZ = r * cos(alpha * 3.14f / 180.0f) * cos(beta * 3.14f / 180.0f);
-	camY = r * sin(beta * 3.14f / 180.0f); */
 	cams[0].camPos[1] = 200.0;
 	cams[0].camPos[0] = 0.0;
 	cams[0].camPos[2] = 0.33;
@@ -793,6 +856,47 @@ void buildScene()
 
 		flyingObjects.push_back(obj);
 	}
+
+	// Clear and fill building vector
+	buildings.clear();
+	for (int r = 0; r < rows; ++r) {
+		for (int c = 0; c < cols; ++c) {
+			// compute standard position center for this grid cell
+			float x = offsetX + c * (buildingW + gap);
+			float z = offsetZ + r * (buildingD + gap);
+
+			bool isStreet = false;
+			// create vertical street down the middle
+			if (c == cols/2) isStreet = true;
+			// create horizontal street across middle
+			if (r == rows/2) isStreet = true;
+
+			// carve out the central garden area (a rectangle around center)
+			int gardenRowStart = rows/2 - gardenSizeRows/2;
+			int gardenRowEnd   = gardenRowStart + gardenSizeRows - 1;
+			int gardenColStart = cols/2 - gardenSizeCols/2;
+			int gardenColEnd   = gardenColStart + gardenSizeCols - 1;
+			bool isGardenCell = (r >= gardenRowStart && r <= gardenRowEnd && c >= gardenColStart && c <= gardenColEnd);
+
+			if (!isStreet && !isGardenCell) {
+				Building b;
+				b.x = x;
+				b.z = z;
+				b.width = buildingW;
+				b.depth = buildingD;
+				b.row = r;
+    			b.col = c;
+				buildings.push_back(b);
+
+				buildingHeights[r][c] = std::max((rand() % 20) + 8.0f, 10.0f);
+			} else {
+				// leave empty: street or garden
+				buildingHeights[r][c] = 0.0f;
+			}
+		}
+	}
+
+
 }
 
 // ------------------------------------------------------------
