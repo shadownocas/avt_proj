@@ -644,14 +644,10 @@ mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
     mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
     mu.computeNormalMatrix3x3();
 
-<<<<<<< Updated upstream
-    dataMesh data;
-    data.meshID = gDroneBodyMeshID;  // green cube mesh id
+    
     data.texMode = 1;                // material shading
-=======
     data.mesh = &allMeshes.cube;
     data.texMode = 4;
->>>>>>> Stashed changes
     data.vm = mu.get(gmu::VIEW_MODEL);
     data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
     data.normal = mu.getNormalMatrix();
@@ -696,23 +692,21 @@ mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
         mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
         mu.computeNormalMatrix3x3();
 
-        dataMesh dm;
-        dm.meshID = gMotorMeshID;
-        dm.texMode = 1;
-        dm.vm = mu.get(gmu::VIEW_MODEL);
-        dm.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-        dm.normal = mu.getNormalMatrix();
-        renderer.renderMesh(dm);
+        data.mesh = &allMeshes.cube;
+        data.texMode = 1;
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
         mu.popMatrix(gmu::MODEL);
     };
 
     placeMotor(0.f, 0.f);
-placeMotor(bodyX, 0.f);
-placeMotor(0.f, bodyZ);
-placeMotor(bodyX, bodyZ);
+	placeMotor(bodyX, 0.f);
+	placeMotor(0.f, bodyZ);
+	placeMotor(bodyX, bodyZ);
 
-
-mu.popMatrix(gmu::MODEL);
+	mu.popMatrix(gmu::MODEL);
 
 	// horizontal street/road
 	mu.pushMatrix(gmu::MODEL);
@@ -737,7 +731,7 @@ mu.popMatrix(gmu::MODEL);
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
 	mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
-	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f); //AHHHHHHHH
+	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 	mu.computeNormalMatrix3x3();
 	data.mesh = &allMeshes.quad;
@@ -1001,7 +995,6 @@ void buildScene()
 	allMeshes.cube.mat.shininess = shininess;
 	allMeshes.cube.mat.texCount = texcount;
 
-<<<<<<< Updated upstream
 // --- GREEN cube dedicated to the drone body ---
 MyMesh droneCube = createCube();
 float ambG[]  = {0.05f, 0.15f, 0.05f, 1.0f};
@@ -1047,7 +1040,6 @@ renderer.myMeshes.push_back(cyl);
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
 	drone.position[2] = -20.0f;
-=======
 	// Sphere
 	allMeshes.sphere = createSphere(1.0f, 16);
 	memcpy(allMeshes.sphere.mat.ambient, amb1, 4 * sizeof(float));
@@ -1056,7 +1048,6 @@ renderer.myMeshes.push_back(cyl);
 	memcpy(allMeshes.sphere.mat.emissive, emissive, 4 * sizeof(float));
 	allMeshes.sphere.mat.shininess = shininess;
 	allMeshes.sphere.mat.texCount = texcount;
->>>>>>> Stashed changes
 
 	// Cone
 	allMeshes.cone = createCone(2.0f, 1.0f, 20);
