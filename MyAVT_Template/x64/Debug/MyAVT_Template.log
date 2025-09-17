@@ -1,13 +1,23 @@
 ﻿  lightDemo.cpp
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(212,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(212,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(307,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(309,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(812,22): warning C4305: '=': truncation from 'double' to 'float'
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(815,22): warning C4305: '=': truncation from 'double' to 'float'
+=======
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(220,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(220,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(315,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(317,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(840,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+>>>>>>> Stashed changes
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(842,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(844,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(908,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(911,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(778,9): warning C4101: 'amesh': unreferenced local variable
   MyAVT_Template.vcxproj -> C:\Users\iness\Documents\mestrado\avt\AVT_Proj\x64\Debug\MyAVT_Template.exe
 =======
 C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(234,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data

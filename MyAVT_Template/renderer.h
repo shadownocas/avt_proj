@@ -12,7 +12,7 @@
 #include "mathUtility.h"
 
 struct dataMesh {
-  int meshID = 0;  //mesh ID in the myMeshes array
+  MyMesh* mesh;    
   float *pvm, *vm, *normal;  //matrices pointers
   int texMode = 0;  //type of shading-> 0:no texturing; 1:modulate diffuse color with texel color; 2:diffuse color is replaced by texel color; 3: multitexturing
 };

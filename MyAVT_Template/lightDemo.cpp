@@ -135,6 +135,8 @@ bool lampsOn = true; // all lamps initially on
 
 std::vector<Lamp> lampPositions;
 
+MeshCollection allMeshes;
+
 // Mouse Tracking Variables
 int startX, startY, tracking = 0;
 
@@ -222,10 +224,15 @@ void timer(int value)
     glutTimerFunc(1000, timer, 0);
 }
 
-void refresh(int value)
+void refresh(int value) // faz RENDER nocas
 {
 	glutPostRedisplay();
 	glutTimerFunc(1000 / 60, refresh, 0);
+}
+
+void animate(){ //UPDATE das posicoes e no render desenha!
+	/* vel = theta * ...;
+	pos += vel * deltaT */
 }
 
 // ------------------------------------------------------------
@@ -238,7 +245,8 @@ void changeSize(int w, int h) {
 	// Prevent a divide by zero, when window is too short
 	if(h == 0)
 		h = 1;
-	WinX = w;   //update globals
+
+	WinX = w;
     WinY = h;
 	// set the viewport to be the entire window
 	glViewport(0, 0, w, h);
@@ -341,7 +349,7 @@ void updateCamera(){
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
 	} else if (activeCam == 1 ) {
 		float orthoSize = 60.0f;
-		mu.ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, -500.0f, 500.0f);
+		mu.ortho(-orthoSize * ratio, orthoSize * ratio, -orthoSize, orthoSize, -500.0f, 500.0f);
 	}
 }
 
@@ -491,11 +499,11 @@ if (activeCam == 3) {
 		lamp.LocalPos[0] = eyePos[0];
 		lamp.LocalPos[1] = eyePos[1];
 		lamp.LocalPos[2] = eyePos[2];
-		lamp.Color[0] = 1.0f;
-		lamp.Color[1] = 0.9f;
-		lamp.Color[2] = 0.7f;
+		lamp.Color[0] = 3.0f; 
+		lamp.Color[1] = 2.7f;
+		lamp.Color[2] = 2.1f;
 		lamp.atten.constant = 1.0f;
-		lamp.atten.linear   = 0.09f;
+		lamp.atten.linear   = 0.02f;
 		lamp.atten.exp      = 0.02f;
 		pointLights.push_back(lamp);
 
@@ -505,7 +513,7 @@ if (activeCam == 3) {
 		mu.scale(gmu::MODEL, 0.25f, ly, 0.25f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
-		data.meshID = 1; // cube
+		data.mesh = &allMeshes.cube; // cube
 		data.texMode = 4; // metal
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -519,7 +527,7 @@ if (activeCam == 3) {
 		mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
-		data.meshID = 2; // sphere mesh
+		data.mesh = &allMeshes.sphere; // sphere mesh
 		data.texMode = 2;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -537,7 +545,7 @@ if (activeCam == 3) {
 		{  0.5f,  0.0f,  1.0f, 1.0f }   // right headlight
 	};
 
-	// Compute drone's rotation matrix (same yaw you use to render cube)
+	// Compute drone's rotation matrix
 	float angle_Y = atan2(drone.direction[0], -drone.direction[2]);
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
@@ -589,7 +597,7 @@ if (activeCam == 3) {
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 
-		data.meshID = obj.meshID;
+		data.mesh = &allMeshes.cube;
 		data.texMode = 1;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -606,7 +614,7 @@ if (activeCam == 3) {
     mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
     mu.computeNormalMatrix3x3();
 
-    data.meshID = 0;
+    data.mesh = &allMeshes.quad;
     data.texMode = 2;
     data.vm = mu.get(gmu::VIEW_MODEL);
     data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -636,9 +644,14 @@ mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
     mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
     mu.computeNormalMatrix3x3();
 
+<<<<<<< Updated upstream
     dataMesh data;
     data.meshID = gDroneBodyMeshID;  // green cube mesh id
     data.texMode = 1;                // material shading
+=======
+    data.mesh = &allMeshes.cube;
+    data.texMode = 4;
+>>>>>>> Stashed changes
     data.vm = mu.get(gmu::VIEW_MODEL);
     data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
     data.normal = mu.getNormalMatrix();
@@ -657,7 +670,7 @@ mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
 		//mu.rotate(gmu::MODEL, -90.0f, 0.0f, 0.0f, 1.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
-		data.meshID = 0;        // quad mesh
+		data.mesh = &allMeshes.quad;        // quad mesh
 		data.texMode = 6;      // texture unit 0 -> asphalt / stone.tga
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -710,7 +723,7 @@ mu.popMatrix(gmu::MODEL);
 		mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
-		data.meshID = 0;
+		data.mesh = &allMeshes.quad;
 		data.texMode = 6;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -727,7 +740,7 @@ mu.popMatrix(gmu::MODEL);
 	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f); //AHHHHHHHH
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 	mu.computeNormalMatrix3x3();
-	data.meshID = 0;
+	data.mesh = &allMeshes.quad;
 	data.texMode = 5;
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -745,7 +758,8 @@ mu.popMatrix(gmu::MODEL);
 		mu.scale(gmu::MODEL, 1.5f, 4.0f, 1.5f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
-		data.meshID = 3; // cone mesh
+
+		data.mesh = &allMeshes.cone;
 		data.texMode = 5;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -764,7 +778,7 @@ mu.popMatrix(gmu::MODEL);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 
-		data.meshID = 1;
+		data.mesh = &allMeshes.cube;
 		data.texMode = 3;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -939,7 +953,7 @@ void processSpecialUp(int key, int x, int y) {
 void buildScene()
 {
 	//Texture Object definition
-	renderer.TexObjArray.texture2D_Loader("assets/stone.tga");
+	renderer.TexObjArray.texture2D_Loader("assets/pavement.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/checker.png");
 	renderer.TexObjArray.texture2D_Loader("assets/lightwood.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");  
@@ -959,29 +973,35 @@ void buildScene()
 	float diff1[] = { 0.8f, 0.1f, 0.1f, 1.0f };
 	float spec1[] = { 0.3f, 0.3f, 0.3f, 1.0f };
 
+	float ambBulb[]  = {0.2f, 0.2f, 0.0f, 1.0f};   // slight yellow base
+	float diffBulb[] = {0.8f, 0.8f, 0.2f, 1.0f};   // bright yellow diffuse
+	float specBulb[] = {0.5f, 0.5f, 0.3f, 1.0f};   // soft highlight
+	float emisBulb[] = {1.0f, 1.0f, 0.2f, 1.0f};   // strong emissive glow (neon!)
+
+
 	float emissive[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	float shininess = 100.0f;
 	int texcount = 0;
 
-	// create geometry and VAO of the quad
-	amesh = createQuad(1, 1);
-	memcpy(amesh.mat.ambient, amb, 4 * sizeof(float));
-	memcpy(amesh.mat.diffuse, diff, 4 * sizeof(float));
-	memcpy(amesh.mat.specular, spec, 4 * sizeof(float));
-	memcpy(amesh.mat.emissive, emissive, 4 * sizeof(float));
-	amesh.mat.shininess = shininess;
-	amesh.mat.texCount = texcount;
-	renderer.myMeshes.push_back(amesh);
+	// Quad
+	allMeshes.quad = createQuad(1, 1);
+	memcpy(allMeshes.quad.mat.ambient, amb, 4 * sizeof(float));
+	memcpy(allMeshes.quad.mat.diffuse, diff, 4 * sizeof(float));
+	memcpy(allMeshes.quad.mat.specular, spec, 4 * sizeof(float));
+	memcpy(allMeshes.quad.mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.quad.mat.shininess = shininess;
+	allMeshes.quad.mat.texCount = texcount;
 
-	amesh = createCube();
-	memcpy(amesh.mat.ambient, amb, 4 * sizeof(float));
-	memcpy(amesh.mat.diffuse, diff, 4 * sizeof(float));
-	memcpy(amesh.mat.specular, spec, 4 * sizeof(float));
-	memcpy(amesh.mat.emissive, emissive, 4 * sizeof(float));
-	amesh.mat.shininess = shininess;
-	amesh.mat.texCount = texcount;
-	renderer.myMeshes.push_back(amesh);
+	// Cube
+	allMeshes.cube = createCube();
+	memcpy(allMeshes.cube.mat.ambient, amb, 4 * sizeof(float));
+	memcpy(allMeshes.cube.mat.diffuse, diff, 4 * sizeof(float));
+	memcpy(allMeshes.cube.mat.specular, spec, 4 * sizeof(float));
+	memcpy(allMeshes.cube.mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.cube.mat.shininess = shininess;
+	allMeshes.cube.mat.texCount = texcount;
 
+<<<<<<< Updated upstream
 // --- GREEN cube dedicated to the drone body ---
 MyMesh droneCube = createCube();
 float ambG[]  = {0.05f, 0.15f, 0.05f, 1.0f};
@@ -1027,37 +1047,26 @@ renderer.myMeshes.push_back(cyl);
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
 	drone.position[2] = -20.0f;
+=======
+	// Sphere
+	allMeshes.sphere = createSphere(1.0f, 16);
+	memcpy(allMeshes.sphere.mat.ambient, amb1, 4 * sizeof(float));
+	memcpy(allMeshes.sphere.mat.diffuse, diff1, 4 * sizeof(float));
+	memcpy(allMeshes.sphere.mat.specular, spec1, 4 * sizeof(float));
+	memcpy(allMeshes.sphere.mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.sphere.mat.shininess = shininess;
+	allMeshes.sphere.mat.texCount = texcount;
+>>>>>>> Stashed changes
 
-	drone.direction[0] = 0.0f;
-	drone.direction[1] = 0.0f;
-	drone.direction[2] = -1.0f;
+	// Cone
+	allMeshes.cone = createCone(2.0f, 1.0f, 20);
+	memcpy(allMeshes.cone.mat.ambient, amb, 4 * sizeof(float));
+	memcpy(allMeshes.cone.mat.diffuse, diff, 4 * sizeof(float));
+	memcpy(allMeshes.cone.mat.specular, spec, 4 * sizeof(float));
+	memcpy(allMeshes.cone.mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.cone.mat.shininess = shininess;
+	allMeshes.cone.mat.texCount = texcount;
 
-	cams[0].camPos[1] = 200.0;
-	cams[0].camPos[0] = 0.0;
-	cams[0].camPos[2] = 0.33;
-	// top ortho
-	cams[1].camPos[1] = 200.0;
-	cams[1].camPos[2] = 0.33;
-	cams[1].type = 1;
-
-	// ----- FLYING OBJECTS GEOMETRY -----
-	MyMesh sphere = createSphere(1.0f, 16);
-	memcpy(sphere.mat.ambient, amb1, 4 * sizeof(float));
-	memcpy(sphere.mat.diffuse, diff1, 4 * sizeof(float));
-	memcpy(sphere.mat.specular, spec1, 4 * sizeof(float));
-	memcpy(sphere.mat.emissive, emissive, 4 * sizeof(float));
-	sphere.mat.shininess = shininess;
-	sphere.mat.texCount = texcount;
-	renderer.myMeshes.push_back(sphere);
-
-	MyMesh cone = createCone(2.0f, 1.0f, 20);
-	memcpy(cone.mat.ambient, amb, 4 * sizeof(float));
-	memcpy(cone.mat.diffuse, diff, 4 * sizeof(float));
-	memcpy(cone.mat.specular, spec, 4 * sizeof(float));
-	memcpy(cone.mat.emissive, emissive, 4 * sizeof(float));
-	cone.mat.shininess = shininess;
-	cone.mat.texCount = texcount;
-	renderer.myMeshes.push_back(cone);
 
 	// ----- INITIALIZE FLYING OBJECTS -----
 	for (int i = 0; i < 10; i++) {
@@ -1121,6 +1130,23 @@ renderer.myMeshes.push_back(cyl);
 			}
 		}
 	}
+
+	drone.position[0] = 20.0f;
+	drone.position[1] = 20.0f;
+	drone.position[2] = -20.0f;
+
+	drone.direction[0] = 0.0f;
+	drone.direction[1] = 0.0f;
+	drone.direction[2] = -1.0f;
+
+	cams[0].camPos[1] = 200.0;
+	cams[0].camPos[0] = 0.0;
+	cams[0].camPos[2] = 0.33;
+	// top ortho
+	cams[1].camPos[1] = 200.0;
+	cams[1].camPos[2] = 0.33;
+	cams[1].type = 1;
+
 }
 
 // ------------------------------------------------------------
@@ -1187,8 +1213,6 @@ int main(int argc, char **argv) {
 		exit(0);
 	}
 	ilInit();
-
-	srand((unsigned int)time(nullptr)); //randomize seed
 
 	buildScene();
 

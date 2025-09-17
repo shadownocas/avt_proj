@@ -25,6 +25,13 @@ struct MyMesh {
 		struct Material mat;
 	};
 
+struct MeshCollection {
+    MyMesh quad;
+    MyMesh cube;
+    MyMesh sphere;
+    MyMesh cone;
+};
+
 MyMesh createCube();
 MyMesh createQuad(float size_x, float size_y);
 MyMesh createSphere(float radius, int divisions);

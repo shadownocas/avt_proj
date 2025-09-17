@@ -292,6 +292,7 @@ void Renderer::setTexUnit(int tuId, int texObjId) {
 
 void Renderer::renderMesh(const dataMesh& data) {
     GLint loc;
+    const MyMesh& mesh = *data.mesh;
 
     // be aware to activate previously the Model shader program
     glUniformMatrix4fv(vm_loc, 1, GL_FALSE, data.vm);
@@ -300,19 +301,19 @@ void Renderer::renderMesh(const dataMesh& data) {
 
     // send the material
     loc = glGetUniformLocation(program, "mat.ambient");
-    glUniform4fv(loc, 1, myMeshes[data.meshID].mat.ambient);
+    glUniform4fv(loc, 1, mesh.mat.ambient);
     loc = glGetUniformLocation(program, "mat.diffuse");
-    glUniform4fv(loc, 1, myMeshes[data.meshID].mat.diffuse);
+    glUniform4fv(loc, 1, mesh.mat.diffuse);
     loc = glGetUniformLocation(program, "mat.specular");
-    glUniform4fv(loc, 1, myMeshes[data.meshID].mat.specular);
+    glUniform4fv(loc, 1, mesh.mat.specular);
     loc = glGetUniformLocation(program, "mat.shininess");
-    glUniform1f(loc, myMeshes[data.meshID].mat.shininess);
+    glUniform1f(loc, mesh.mat.shininess);
 
     // Render mesh
     glUniform1i(texMode_loc, data.texMode);
 
-    glBindVertexArray(myMeshes[data.meshID].vao);
-    glDrawElements(myMeshes[data.meshID].type, myMeshes[data.meshID].numIndexes, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(mesh.vao);
+    glDrawElements(mesh.type, mesh.numIndexes, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
 
