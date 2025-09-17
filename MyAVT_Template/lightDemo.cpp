@@ -31,6 +31,9 @@
 #include "mathUtility.h"
 #include "model.h"
 #include "texture.h"
+#include <cmath>   // sinf, cosf, atan2f
+#include <algorithm> // if you use std::clamp elsewhere
+
 
 using namespace std;
 
@@ -50,7 +53,46 @@ gmu mu;
 Renderer renderer;
 	
 // Camera Position
-//float camX, camY, camZ;
+// Follow-camera mouse offsets (degrees)
+float followYawOffsetDeg = 0.f;
+float followPitchOffsetDeg = 15.f;   // slight downward tilt by default
+float minPitchDeg = -10.0f, maxPitchDeg = 85.0f;
+// mouse sensitivity & state
+float MOUSE_SENS_YAW = 0.25f;    // deg per pixel
+float MOUSE_SENS_PITCH = 0.25f;  // deg per pixel
+float startYawDeg = 0.f, startPitchDeg = 0.f;
+float startFollowDistance = 20.f;
+// Zoom sensitivity (world units per pixel of RMB drag)
+float ZOOM_SENS = 0.05f;
+
+float sYawDeg = 0.0f, sPitchDeg = 15.0f, sDist = 15.0f; // init to your defaults
+int prevX = 0, prevY = 0;
+
+//drone meshs
+int gDroneBodyMeshID = -1;   // mesh id for the GREEN cube used only by the drone
+int gMotorMeshID = -1;   // mesh id for the motor cylinder
+
+
+// --- Drone flight state (Task 4)
+float yawDeg   = 0.0f;            // heading angle (deg)
+float pitchDeg = 0.0f;            // nose up/down (+ = back)
+float rollDeg  = 0.0f;            // bank left/right (+ = left)
+
+float velX = 0.0f, velY = 0.0f, velZ = 0.0f;  // world velocities
+
+// Controls & physics
+const float maxTiltDeg      = 25.0f;     // clamp for pitch/roll
+const float tiltStepDeg     = 1.5f;      // degrees added per frame while arrow held
+const float tiltReturnDeg   = 1.0f;      // auto-level speed per frame when released
+const float accelGain       = 0.02f;     // horizontal accel per frame from tilt
+const float horizDrag       = 0.02f;     // decay per frame (0..1)
+const float vertAccel       = 0.01f;     // W/S vertical accel per frame
+const float vertDrag        = 0.01f;     // vertical decay per frame
+const float maxHorizSpeed   = 0.6f;      // clamp XY speed
+const float maxVertSpeed    = 0.5f;      // clamp Y speed
+
+// Special (arrow) key states
+bool spKeys[256] = {false};       // GLUT special keys (UP/DOWN/LEFT/RIGHT)
 
 bool keyStates[256] = {false};
 
@@ -80,12 +122,12 @@ float followHeight = 5.0f;     // camera height above drone
 float droneRotSpeed = 1.5f;    // degrees per frame
 
 struct Camera {
-  float camPos[3] = {0.0f, 0.0f, 0.0f};
+  float camPos[4] = {0.0f, 0.0f, 0.0f, 0.0f}; //camera 4 for orbit view of drone
   float camTarget[3] = {0.0f, 0.0f, 0.0f};
   int type=0; //0:perspective, 1:orthographic
 };
 
-Camera cams[3];
+Camera cams[4];
 
 int activeCam = 0;
 
@@ -218,8 +260,8 @@ void changeSize(int w, int h) {
 //
 // Render stufff
 //
-
-void dronePosition(){
+void updateFlight() {
+    const float D2R = 3.1415926f / 180.0f;
 	if (keyStates['w']){
 		drone.position[0] += drone.direction[0] * droneSpeed;
 		drone.position[2] += drone.direction[2] * droneSpeed;
@@ -229,26 +271,65 @@ void dronePosition(){
 		drone.position[0] -= drone.direction[0] * droneSpeed;
 		drone.position[2] -= drone.direction[2] * droneSpeed;
 	}
+    // --- Yaw (A/D): adjust heading, then rebuild forward vector
+    if (keyStates['a']) yawDeg -= droneRotSpeed;   // deg/frame (uses your existing var)
+    if (keyStates['d']) yawDeg += droneRotSpeed;
 
-	// Rotate left/right (yaw around y-axis)
-	if (keyStates['a']){
-		float angle = -droneRotSpeed * 3.14159f / 180.0f;
-		float cosA = cos(angle);
-		float sinA = sin(angle);
-		float dx = drone.direction[0];
-		float dz = drone.direction[2];
-		drone.direction[0] = dx * cosA - dz * sinA;
-		drone.direction[2] = dx * sinA + dz * cosA;
-	}
-	if (keyStates['d']){
-		float angle = droneRotSpeed * 3.14159f / 180.0f;
-		float cosA = cos(angle);
-		float sinA = sin(angle);
-		float dx = drone.direction[0];
-		float dz = drone.direction[2];
-		drone.direction[0] = dx * cosA - dz * sinA;
-		drone.direction[2] = dx * sinA + dz * cosA;
-	}
+    float yawRad = yawDeg * D2R;
+    drone.direction[0] = std::sin(yawRad);
+    drone.direction[1] = 0.0f;
+    drone.direction[2] = -std::cos(yawRad);
+
+    // --- Pitch & Roll (Arrow keys): change tilt, with auto-level when released
+    if (spKeys[GLUT_KEY_LEFT])  rollDeg += tiltStepDeg;
+    if (spKeys[GLUT_KEY_RIGHT]) rollDeg -= tiltStepDeg;
+    if (!spKeys[GLUT_KEY_LEFT] && !spKeys[GLUT_KEY_RIGHT]) {
+        if (rollDeg > 0)  rollDeg = std::max(0.0f, rollDeg - tiltReturnDeg);
+        if (rollDeg < 0)  rollDeg = std::min(0.0f, rollDeg + tiltReturnDeg);
+    }
+
+    if (spKeys[GLUT_KEY_UP])    pitchDeg -= tiltStepDeg;  // nose down -> forward accel
+    if (spKeys[GLUT_KEY_DOWN])  pitchDeg += tiltStepDeg;  // nose up   -> backward accel
+    if (!spKeys[GLUT_KEY_UP] && !spKeys[GLUT_KEY_DOWN]) {
+        if (pitchDeg > 0) pitchDeg = std::max(0.0f, pitchDeg - tiltReturnDeg);
+        if (pitchDeg < 0) pitchDeg = std::min(0.0f, pitchDeg + tiltReturnDeg);
+    }
+
+    // clamp tilts
+    pitchDeg = std::max(-maxTiltDeg, std::min(maxTiltDeg, pitchDeg));
+    rollDeg  = std::max(-maxTiltDeg, std::min(maxTiltDeg,  rollDeg));
+
+    // --- Acceleration from tilt (local -> world)
+    // local axes: +X = right wing, +Z = forward. Nose down (negative pitch) pushes forward.
+    float ax_local = std::sin(rollDeg * D2R)  * accelGain;   // left/right
+    float az_local = -std::sin(pitchDeg * D2R) * accelGain;  // forward/back
+
+    float cosY = std::cos(yawRad), sinY = std::sin(yawRad);
+    float ax = ax_local * cosY + az_local * sinY;
+    float az = -ax_local * sinY + az_local * cosY;
+
+    velX += ax;
+    velZ += az;
+
+    // --- Throttle (W/S): vertical speed
+    if (keyStates['w']) velY += vertAccel;
+    if (keyStates['s']) velY -= vertAccel;
+
+    // --- Drag (gradual slow down when not leaning)
+    velX *= (1.0f - horizDrag);
+    velZ *= (1.0f - horizDrag);
+    velY *= (1.0f - vertDrag);
+
+    // --- Clamp speeds
+    float h = std::sqrt(velX*velX + velZ*velZ);
+    if (h > maxHorizSpeed) { float k = maxHorizSpeed / h; velX *= k; velZ *= k; }
+    if (velY >  maxVertSpeed) velY =  maxVertSpeed;
+    if (velY < -maxVertSpeed) velY = -maxVertSpeed;
+
+    // --- Integrate position
+    drone.position[0] += velX;
+    drone.position[1] += velY;
+    drone.position[2] += velZ;
 }
 
 void updateCamera(){
@@ -256,9 +337,9 @@ void updateCamera(){
 
 	mu.loadIdentity(gmu::PROJECTION);
 
-	if (activeCam == 0 || activeCam == 2) {
+	if (activeCam == 0 || activeCam == 2 || activeCam == 3) {
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
-	} else if (activeCam == 1) {
+	} else if (activeCam == 1 ) {
 		float orthoSize = 60.0f;
 		mu.ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, -500.0f, 500.0f);
 	}
@@ -280,7 +361,7 @@ void renderSim(void) {
 	renderer.setTexUnit(6, 6);
 
     // Update drone movement
-    dronePosition();
+    updateFlight();
     updateCamera();
 
     // --- Set camera/view ---
@@ -317,6 +398,66 @@ void renderSim(void) {
 			obj.rotationAngle = 0.0f;
 		}
 	}
+
+	// --- Follow camera (activeCam == 2): orbit around drone forward with mouse offsets
+if (activeCam == 2) {
+        const float k = 0.20f; // 0..1, higher = snappier
+    sYawDeg   += (followYawOffsetDeg   - sYawDeg)   * k;
+    sPitchDeg += (followPitchOffsetDeg - sPitchDeg) * k;
+    sDist     += (followDistance       - sDist)     * k;
+
+    // --- Build follow camera from smoothed values ---
+    const float DEG2RAD = 3.1415926f / 180.0f;
+
+    // Pivot at fixed height over the drone (prevents “zoomy” feeling)
+    float pivotX = drone.position[0];
+    float pivotY = drone.position[1] + followHeight;
+    float pivotZ = drone.position[2];
+
+    // Camera position: orbit on XZ using YAW only (fixed radius sDist)
+    float baseYaw = atan2f(drone.direction[0], -drone.direction[2]); // radians
+    float yawCam  = baseYaw + (sYawDeg + 180.0f) * DEG2RAD;  // put cam behind at yaw=0
+	float ox = sinf(yawCam), oz = cosf(yawCam);
+
+    cams[2].camPos[0] = pivotX - ox * sDist;
+    cams[2].camPos[1] = pivotY;                  // fixed height
+    cams[2].camPos[2] = pivotZ - oz * sDist;
+
+    // Camera target: use PITCH to tilt the VIEW (not the position)
+    float pitchCam = sPitchDeg * DEG2RAD;
+
+    // forward (XZ) normalized
+    float fx = drone.direction[0], fz = drone.direction[2];
+    float fl = std::sqrt(fx*fx + fz*fz); if (fl < 1e-6f) { fx = 0.f; fz = -1.f; fl = 1.f; }
+    fx /= fl; fz /= fl;
+
+    float lx = fx * std::cos(pitchCam);
+    float ly = std::sin(pitchCam);
+    float lz = fz * std::cos(pitchCam);
+
+    float lookAhead = 40.0f;
+    cams[2].camTarget[0] = pivotX + lx * lookAhead;
+    cams[2].camTarget[1] = pivotY + ly * lookAhead;
+    cams[2].camTarget[2] = pivotZ + lz * lookAhead;
+}
+
+//camera for orbit view of the drone
+if (activeCam == 3) { 
+    const float DEG2RAD = 3.1415926f/180.0f;
+
+    // alpha/beta/r are already in your file; just make sure conversions use PI
+    float cx = r * sinf(alpha * DEG2RAD) * cosf(beta * DEG2RAD);
+    float cz = r * cosf(alpha * DEG2RAD) * cosf(beta * DEG2RAD);
+    float cy = r * sinf(beta  * DEG2RAD);
+
+    cams[3].camTarget[0] = drone.position[0];
+    cams[3].camTarget[1] = drone.position[1];
+    cams[3].camTarget[2] = drone.position[2];
+
+    cams[3].camPos[0] = drone.position[0] + cx;
+    cams[3].camPos[1] = drone.position[1] + cy;
+    cams[3].camPos[2] = drone.position[2] + cz;
+}
 
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
@@ -473,21 +614,37 @@ void renderSim(void) {
     renderer.renderMesh(data);
     mu.popMatrix(gmu::MODEL);
 
-    // --- Draw drone ---
+// --- Draw drone (green cube body + 4 white motors) ---
+mu.pushMatrix(gmu::MODEL);
+mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
+
+// Body size (keep these up here so we can use them for the pivot)
+const float bodyX = 1.6f, bodyY = 0.25f, bodyZ = 1.6f;
+
+// yaw (from direction)
+float angleY = atan2(drone.direction[0], -drone.direction[2]) * 180.0f / 3.14159f;
+
+// >>> move pivot to the cube center, rotate, then move back <<<
+mu.translate(gmu::MODEL,  bodyX * 0.5f, bodyY * 0.5f, bodyZ * 0.5f); // to center
+mu.rotate(   gmu::MODEL,  angleY,       0.0f, 1.0f, 0.0f);            // yaw
+mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
+
+// 1) BODY (scaled green cube)
+
     mu.pushMatrix(gmu::MODEL);
-    mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
-    float angleY = atan2(drone.direction[0], -drone.direction[2]) * 180.0f / 3.14159f;
-    mu.rotate(gmu::MODEL, angleY, 0.0f, 1.0f, 0.0f);
+    mu.scale(gmu::MODEL, bodyX, bodyY, bodyZ);
     mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
     mu.computeNormalMatrix3x3();
 
-    data.meshID = 1;
-    data.texMode = 4;
+    dataMesh data;
+    data.meshID = gDroneBodyMeshID;  // green cube mesh id
+    data.texMode = 1;                // material shading
     data.vm = mu.get(gmu::VIEW_MODEL);
     data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
     data.normal = mu.getNormalMatrix();
     renderer.renderMesh(data);
     mu.popMatrix(gmu::MODEL);
+
 
 	// --- Draw streets (as long quads with asphalt texture) ---
 	/* mu.pushMatrix(gmu::MODEL);
@@ -509,6 +666,40 @@ void renderSim(void) {
 		mu.loadIdentity(gmu::MODEL);
 	}
 	mu.popMatrix(gmu::MODEL); */
+
+// 2) MOTORS (4 short white cylinders) — attached to the same parent frame
+
+    const float motorR = 0.22f;   // radius
+    const float motorH = 0.15f;   // height
+
+    // TOP of the cube is at Y = bodyY because cube vertices are 0..1
+    const float motorY = bodyY + motorH * 0.5f;   // center sits just above the top face
+
+    // If you want the motors TANGENT to the two edges (fully on top surface):
+    auto placeMotor = [&](float x, float z) {
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, x, motorY, z);
+        mu.scale(gmu::MODEL, motorR, motorH, motorR);  // cylinder axis = Y
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
+
+        dataMesh dm;
+        dm.meshID = gMotorMeshID;
+        dm.texMode = 1;
+        dm.vm = mu.get(gmu::VIEW_MODEL);
+        dm.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        dm.normal = mu.getNormalMatrix();
+        renderer.renderMesh(dm);
+        mu.popMatrix(gmu::MODEL);
+    };
+
+    placeMotor(0.f, 0.f);
+placeMotor(bodyX, 0.f);
+placeMotor(0.f, bodyZ);
+placeMotor(bodyX, bodyZ);
+
+
+mu.popMatrix(gmu::MODEL);
 
 	// horizontal street/road
 	mu.pushMatrix(gmu::MODEL);
@@ -583,6 +774,7 @@ void renderSim(void) {
 		mu.popMatrix(gmu::MODEL);
 	}
 
+/** 
    // Camera position: fixed behind and above drone
 	cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
 	cams[2].camPos[1] = drone.position[1] + followHeight;
@@ -594,7 +786,7 @@ void renderSim(void) {
 	cams[2].camTarget[1] = drone.position[1];
 	cams[2].camTarget[2] = drone.position[2] + drone.direction[2] * lookAhead;
 
-
+**/
     glutSwapBuffers();
 }
 
@@ -654,6 +846,9 @@ void processKeys(unsigned char key, int xx, int yy)
 		case '3':
 			activeCam = 2;
 			break;
+		case '4': 
+			activeCam = 3;
+			break; 
 	}
 }
 
@@ -665,72 +860,52 @@ void processKeys(unsigned char key, int xx, int yy)
 
 void processMouseButtons(int button, int state, int xx, int yy)
 {
-	// start tracking the mouse
-	if (state == GLUT_DOWN)  {
-		startX = xx;
-		startY = yy;
-		if (button == GLUT_LEFT_BUTTON)
-			tracking = 1;
-		else if (button == GLUT_RIGHT_BUTTON)
-			tracking = 2;
-	}
+    if (state == GLUT_DOWN)  {
+        startX = prevX = xx;
+        startY = prevY = yy;
 
-	//stop tracking the mouse
-	else if (state == GLUT_UP) {
-		if (tracking == 1) {
-			alpha -= (xx - startX);
-			beta += (yy - startY);
-		}
-		else if (tracking == 2) {
-			r += (yy - startY) * 0.01f;
-			if (r < 0.1f)
-				r = 0.1f;
-		}
-		tracking = 0;
-	}
+        if (button == GLUT_LEFT_BUTTON) {
+            tracking = 1; // orbit
+            // no need for startYawDeg/startPitchDeg with incremental mode
+        }
+        else if (button == GLUT_RIGHT_BUTTON) {
+            tracking = 2; // zoom
+            startFollowDistance = followDistance;
+        }
+    } else if (state == GLUT_UP) {
+        tracking = 0;
+    }
 }
 
 // Track mouse motion while buttons are pressed
 
 void processMouseMotion(int xx, int yy)
 {
+    int dx = xx - prevX;
+    int dy = yy - prevY;
+    prevX = xx; prevY = yy;
 
-	int deltaX, deltaY;
-	float alphaAux, betaAux;
-	float rAux;
+    if (activeCam == 2) {
+        if (tracking == 1) {             // ORBIT (LMB)
+            followYawOffsetDeg   -= dx * MOUSE_SENS_YAW;   // flip sign if feels inverted
+            followPitchOffsetDeg += dy * MOUSE_SENS_PITCH;
 
-	deltaX =  - xx + startX;
-	deltaY =    yy - startY;
+            // clamp pitch only
+            if (followPitchOffsetDeg > maxPitchDeg)       followPitchOffsetDeg = maxPitchDeg;
+            else if (followPitchOffsetDeg < minPitchDeg)  followPitchOffsetDeg = minPitchDeg;
 
-	// left mouse button: move camera
-	if (tracking == 1) {
-
-
-		alphaAux = alpha + deltaX;
-		betaAux = beta + deltaY;
-
-		if (betaAux > 85.0f)
-			betaAux = 85.0f;
-		else if (betaAux < -85.0f)
-			betaAux = -85.0f;
-		rAux = r;
-	}
-	// right mouse button: zoom
-	else if (tracking == 2) {
-
-		alphaAux = alpha;
-		betaAux = beta;
-		rAux = r + (deltaY * 0.01f);
-		if (rAux < 0.1f)
-			rAux = 0.1f;
-	}
-
-	/* camX = rAux * sin(alphaAux * 3.14f / 180.0f) * cos(betaAux * 10.14f / 180.0f);
-	camZ = rAux * cos(alphaAux * 3.14f / 180.0f) * cos(betaAux * 10.14f / 180.0f);
-	camY = rAux *   						       sin(betaAux * 10.14f / 180.0f);
- */
-//  uncomment this if not using an idle or refresh func
-//	glutPostRedisplay();
+            // TEMP: remove yaw wrap entirely while testing smooth 360
+            // (comment out your two lines below)
+            // if (followYawOffsetDeg > 180.f)  followYawOffsetDeg -= 360.f;
+            // if (followYawOffsetDeg < -180.f) followYawOffsetDeg += 360.f;
+        }
+        else if (tracking == 2) {         // ZOOM (RMB)
+            followDistance = startFollowDistance + (yy - startY) * ZOOM_SENS;
+            if (followDistance < 5.0f)  followDistance = 5.0f;
+            if (followDistance > 60.0f) followDistance = 60.0f;
+        }
+        return;
+    }
 }
 
 
@@ -746,6 +921,14 @@ void mouseWheel(int wheel, int direction, int x, int y) {
 
 //  uncomment this if not using an idle or refresh func
 //	glutPostRedisplay();
+}
+
+
+void processSpecialDown(int key, int x, int y) {
+    spKeys[key] = true;
+}
+void processSpecialUp(int key, int x, int y) {
+    spKeys[key] = false;
 }
 
 
@@ -798,6 +981,48 @@ void buildScene()
 	amesh.mat.shininess = shininess;
 	amesh.mat.texCount = texcount;
 	renderer.myMeshes.push_back(amesh);
+
+// --- GREEN cube dedicated to the drone body ---
+MyMesh droneCube = createCube();
+float ambG[]  = {0.05f, 0.15f, 0.05f, 1.0f};
+float diffG[] = {0.15f, 0.80f, 0.15f, 1.0f};  // green
+float specG[] = {0.20f, 0.90f, 0.20f, 1.0f};
+memcpy(droneCube.mat.ambient,  ambG,  4*sizeof(float));
+memcpy(droneCube.mat.diffuse,  diffG, 4*sizeof(float));
+memcpy(droneCube.mat.specular, specG, 4*sizeof(float));
+memcpy(droneCube.mat.emissive, emissive, 4*sizeof(float));
+droneCube.mat.shininess = 80.0f;
+droneCube.mat.texCount  = 0;
+
+gDroneBodyMeshID = (int)renderer.myMeshes.size();
+renderer.myMeshes.push_back(droneCube);
+
+
+// --- Motor mesh (WHITE cylinder) ---
+MyMesh cyl = createCylinder(1.0f, 1.0f, 24);
+
+float ambW[]  = {0.20f, 0.20f, 0.20f, 1.0f};  // small ambient
+float diffW[] = {0.95f, 0.95f, 0.95f, 1.0f};  // white diffuse
+float specW[] = {1.00f, 1.00f, 1.00f, 1.0f};  // bright specular
+memcpy(cyl.mat.ambient,  ambW,  4*sizeof(float));
+memcpy(cyl.mat.diffuse,  diffW, 4*sizeof(float));
+memcpy(cyl.mat.specular, specW, 4*sizeof(float));
+cyl.mat.shininess = 120.0f;                   // shiny
+cyl.mat.texCount  = 0;
+
+gMotorMeshID = (int)renderer.myMeshes.size();
+renderer.myMeshes.push_back(cyl);
+
+
+	for (int r = 0; r < rows; ++r) {
+		for (int c = 0; c < cols; ++c) {
+			buildingHeights[r][c] = std::max((rand() % 20) + 5.0f, 10.0f);
+		}
+	}
+
+
+
+	printf("\nNumber of Texture Objects is %d\n\n", renderer.TexObjArray.getNumTextureObjects());
 
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
@@ -932,6 +1157,9 @@ int main(int argc, char **argv) {
 	glutMouseFunc(processMouseButtons);
 	glutMotionFunc(processMouseMotion);
 	glutMouseWheelFunc ( mouseWheel ) ;
+
+	glutSpecialFunc(processSpecialDown);
+	glutSpecialUpFunc(processSpecialUp);
 	
 
 //	return from main loop

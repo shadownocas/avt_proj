@@ -1,4 +1,5 @@
 ﻿  lightDemo.cpp
+<<<<<<< Updated upstream
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(212,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(212,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(307,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
@@ -8,4 +9,28 @@ C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(815,
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(842,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
 C:\Users\iness\Documents\mestrado\avt\AVT_Proj\MyAVT_Template\lightDemo.cpp(844,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
   MyAVT_Template.vcxproj -> C:\Users\iness\Documents\mestrado\avt\AVT_Proj\x64\Debug\MyAVT_Template.exe
+=======
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(234,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(234,17): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(366,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(368,36): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(956,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(959,22): warning C4305: '=': truncation from 'double' to 'float'
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(986,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\lightDemo.cpp(988,35): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+  mathUtility.cpp
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(142,11): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(143,11): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(231,10): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(357,12): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(384,8): warning C4244: 'return': conversion from 'double' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(483,62): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(484,62): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\mathUtility.cpp(486,40): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+  texture.cpp
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\texture.cpp(99,26): warning C4267: 'return': conversion from 'size_t' to 'unsigned int', possible loss of data
+C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\MyAVT_Template\texture.cpp(103,36): warning C4267: 'argument': conversion from 'size_t' to 'GLsizei', possible loss of data
+  Generating Code...
+  MyAVT_Template.vcxproj -> C:\Users\Guilherme\Desktop\universidade\avt\avt_proj\x64\Debug\MyAVT_Template.exe
+>>>>>>> Stashed changes
   0 File(s) copied
