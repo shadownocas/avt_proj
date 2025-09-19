@@ -970,35 +970,6 @@ void buildScene()
 	allMeshes.cube.mat.shininess = shininess;
 	allMeshes.cube.mat.texCount = texcount;
 
-// --- GREEN cube dedicated to the drone body ---
-MyMesh droneCube = createCube();
-float ambG[]  = {0.05f, 0.15f, 0.05f, 1.0f};
-float diffG[] = {0.15f, 0.80f, 0.15f, 1.0f};  // green
-float specG[] = {0.20f, 0.90f, 0.20f, 1.0f};
-memcpy(droneCube.mat.ambient,  ambG,  4*sizeof(float));
-memcpy(droneCube.mat.diffuse,  diffG, 4*sizeof(float));
-memcpy(droneCube.mat.specular, specG, 4*sizeof(float));
-memcpy(droneCube.mat.emissive, emissive, 4*sizeof(float));
-droneCube.mat.shininess = 80.0f;
-droneCube.mat.texCount  = 0;
-
-renderer.myMeshes.push_back(droneCube);
-
-
-// --- Motor mesh (WHITE cylinder) ---
-MyMesh cyl = createCylinder(1.0f, 1.0f, 24);
-
-float ambW[]  = {0.20f, 0.20f, 0.20f, 1.0f};  // small ambient
-float diffW[] = {0.95f, 0.95f, 0.95f, 1.0f};  // white diffuse
-float specW[] = {1.00f, 1.00f, 1.00f, 1.0f};  // bright specular
-memcpy(cyl.mat.ambient,  ambW,  4*sizeof(float));
-memcpy(cyl.mat.diffuse,  diffW, 4*sizeof(float));
-memcpy(cyl.mat.specular, specW, 4*sizeof(float));
-cyl.mat.shininess = 120.0f;                   // shiny
-cyl.mat.texCount  = 0;
-
-	renderer.myMeshes.push_back(cyl);
-
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
 	drone.position[2] = -20.0f;
