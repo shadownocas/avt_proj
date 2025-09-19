@@ -279,56 +279,11 @@ void updateFlight() {
     if (keyStates['a']) yawDeg -= droneRotSpeed;   // deg/frame (uses your existing var)
     if (keyStates['d']) yawDeg += droneRotSpeed;
 
+	
     float yawRad = yawDeg * D2R;
     drone.direction[0] = std::sin(yawRad);
     drone.direction[1] = 0.0f;
     drone.direction[2] = -std::cos(yawRad);
-
-    // --- Pitch & Roll (Arrow keys): change tilt, with auto-level when released
-    if (spKeys[GLUT_KEY_LEFT])  rollDeg += tiltStepDeg;
-    if (spKeys[GLUT_KEY_RIGHT]) rollDeg -= tiltStepDeg;
-    if (!spKeys[GLUT_KEY_LEFT] && !spKeys[GLUT_KEY_RIGHT]) {
-        if (rollDeg > 0)  rollDeg = std::max(0.0f, rollDeg - tiltReturnDeg);
-        if (rollDeg < 0)  rollDeg = std::min(0.0f, rollDeg + tiltReturnDeg);
-    }
-
-    if (spKeys[GLUT_KEY_UP])    pitchDeg -= tiltStepDeg;  // nose down -> forward accel
-    if (spKeys[GLUT_KEY_DOWN])  pitchDeg += tiltStepDeg;  // nose up   -> backward accel
-    if (!spKeys[GLUT_KEY_UP] && !spKeys[GLUT_KEY_DOWN]) {
-        if (pitchDeg > 0) pitchDeg = std::max(0.0f, pitchDeg - tiltReturnDeg);
-        if (pitchDeg < 0) pitchDeg = std::min(0.0f, pitchDeg + tiltReturnDeg);
-    }
-
-    // clamp tilts
-    pitchDeg = std::max(-maxTiltDeg, std::min(maxTiltDeg, pitchDeg));
-    rollDeg  = std::max(-maxTiltDeg, std::min(maxTiltDeg,  rollDeg));
-
-    // --- Acceleration from tilt (local -> world)
-    // local axes: +X = right wing, +Z = forward. Nose down (negative pitch) pushes forward.
-    float ax_local = std::sin(rollDeg * D2R)  * accelGain;   // left/right
-    float az_local = -std::sin(pitchDeg * D2R) * accelGain;  // forward/back
-
-    float cosY = std::cos(yawRad), sinY = std::sin(yawRad);
-    float ax = ax_local * cosY + az_local * sinY;
-    float az = -ax_local * sinY + az_local * cosY;
-
-    velX += ax;
-    velZ += az;
-
-    // --- Throttle (W/S): vertical speed
-    if (keyStates['w']) velY += vertAccel;
-    if (keyStates['s']) velY -= vertAccel;
-
-    // --- Drag (gradual slow down when not leaning)
-    velX *= (1.0f - horizDrag);
-    velZ *= (1.0f - horizDrag);
-    velY *= (1.0f - vertDrag);
-
-    // --- Clamp speeds
-    float h = std::sqrt(velX*velX + velZ*velZ);
-    if (h > maxHorizSpeed) { float k = maxHorizSpeed / h; velX *= k; velZ *= k; }
-    if (velY >  maxVertSpeed) velY =  maxVertSpeed;
-    if (velY < -maxVertSpeed) velY = -maxVertSpeed;
 
     // --- Integrate position
     drone.position[0] += velX;
@@ -400,48 +355,48 @@ void renderSim(void) {
 	}
 
 	// --- Follow camera (activeCam == 2): orbit around drone forward with mouse offsets
-if (activeCam == 2) {
+	if (activeCam == 2) {
         const float k = 0.20f; // 0..1, higher = snappier
-    sYawDeg   += (followYawOffsetDeg   - sYawDeg)   * k;
-    sPitchDeg += (followPitchOffsetDeg - sPitchDeg) * k;
-    sDist     += (followDistance       - sDist)     * k;
+		sYawDeg   += (followYawOffsetDeg   - sYawDeg)   * k;
+		sPitchDeg += (followPitchOffsetDeg - sPitchDeg) * k;
+		sDist     += (followDistance       - sDist)     * k;
 
-    // --- Build follow camera from smoothed values ---
-    const float DEG2RAD = 3.1415926f / 180.0f;
+		// --- Build follow camera from smoothed values ---
+		const float DEG2RAD = 3.1415926f / 180.0f;
 
-    // Pivot at fixed height over the drone (prevents “zoomy” feeling)
-    float pivotX = drone.position[0];
-    float pivotY = drone.position[1] + followHeight;
-    float pivotZ = drone.position[2];
+		// Pivot at fixed height over the drone (prevents “zoomy” feeling)
+		float pivotX = drone.position[0];
+		float pivotY = drone.position[1] + followHeight;
+		float pivotZ = drone.position[2];
 
-    // Camera position: orbit on XZ using YAW only (fixed radius sDist)
-    float baseYaw = atan2f(drone.direction[0], -drone.direction[2]); // radians
-    float yawCam  = baseYaw + (sYawDeg + 180.0f) * DEG2RAD;  // put cam behind at yaw=0
-	float ox = sinf(yawCam), oz = cosf(yawCam);
+		// Camera position: orbit on XZ using YAW only (fixed radius sDist)
+		float baseYaw = atan2f(drone.direction[0], -drone.direction[2]); // radians
+		float yawCam  = baseYaw + (sYawDeg + 180.0f) * DEG2RAD;  // put cam behind at yaw=0
+		float ox = sinf(yawCam), oz = cosf(yawCam);
 
-    cams[2].camPos[0] = pivotX - ox * sDist;
-    cams[2].camPos[1] = pivotY;                  // fixed height
-    cams[2].camPos[2] = pivotZ - oz * sDist;
+		cams[2].camPos[0] = drone.position[0] + followHeight;
+		cams[2].camPos[1] = drone.position[1] + followHeight;
+		cams[2].camPos[2] = drone.position[2] + followHeight;
 
-    // Camera target: use PITCH to tilt the VIEW (not the position)
-    float pitchCam = sPitchDeg * DEG2RAD;
+		// Camera target: use PITCH to tilt the VIEW (not the position)
+		float pitchCam = sPitchDeg * DEG2RAD;
 
-    // forward (XZ) normalized
-    float fx = drone.direction[0], fz = drone.direction[2];
-    float fl = std::sqrt(fx*fx + fz*fz); if (fl < 1e-6f) { fx = 0.f; fz = -1.f; fl = 1.f; }
-    fx /= fl; fz /= fl;
+		// forward (XZ) normalized
+		float fx = drone.direction[0], fz = drone.direction[2];
+		float fl = std::sqrt(fx*fx + fz*fz); if (fl < 1e-6f) { fx = 0.f; fz = -1.f; fl = 1.f; }
+		fx /= fl; fz /= fl;
 
-    float lx = fx * std::cos(pitchCam);
-    float ly = std::sin(pitchCam);
-    float lz = fz * std::cos(pitchCam);
+		float lx = fx * std::cos(pitchCam);
+		float ly = std::sin(pitchCam);
+		float lz = fz * std::cos(pitchCam);
 
-    float lookAhead = 40.0f;
-    cams[2].camTarget[0] = pivotX + lx * lookAhead;
-    cams[2].camTarget[1] = pivotY + ly * lookAhead;
-    cams[2].camTarget[2] = pivotZ + lz * lookAhead;
-}
+		float lookAhead = 40.0f;
+		cams[2].camTarget[0] = drone.position[0];
+		cams[2].camTarget[1] = drone.position[1];
+		cams[2].camTarget[2] = drone.position[2];
+	}
 
-//camera for orbit view of the drone
+	//camera for orbit view of the drone
 
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
@@ -970,9 +925,6 @@ void buildScene()
 	allMeshes.cube.mat.shininess = shininess;
 	allMeshes.cube.mat.texCount = texcount;
 
-	drone.position[0] = 20.0f;
-	drone.position[1] = 20.0f;
-	drone.position[2] = -20.0f;
 	// Sphere
 	allMeshes.sphere = createSphere(1.0f, 16);
 	memcpy(allMeshes.sphere.mat.ambient, amb1, 4 * sizeof(float));
