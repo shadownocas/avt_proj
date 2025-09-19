@@ -68,10 +68,6 @@ float ZOOM_SENS = 0.05f;
 float sYawDeg = 0.0f, sPitchDeg = 15.0f, sDist = 15.0f; // init to your defaults
 int prevX = 0, prevY = 0;
 
-//drone meshs
-int gDroneBodyMeshID = -1;   // mesh id for the GREEN cube used only by the drone
-int gMotorMeshID = -1;   // mesh id for the motor cylinder
-
 
 // --- Drone flight state (Task 4)
 float yawDeg   = 0.0f;            // heading angle (deg)
@@ -99,6 +95,7 @@ bool keyStates[256] = {false};
 struct Drone {
     float position[3] = {20.0f, 20.0f, -20.0f}; // xyz
     float direction[3] = {0.0f, 0.0f, -1.0f}; // pointing along -Z initially
+	float speed;
 };
 
 struct FlyingObject {
@@ -224,7 +221,7 @@ void timer(int value)
     glutTimerFunc(1000, timer, 0);
 }
 
-void refresh(int value) // faz RENDER nocas
+void refresh(int value) // faz RENDER
 {
 	glutPostRedisplay();
 	glutTimerFunc(1000 / 60, refresh, 0);
@@ -275,7 +272,6 @@ void updateFlight() {
 		drone.position[2] += drone.direction[2] * droneSpeed;
 	}
 	if (keyStates['s']){
-		printf("drone andou??\n");
 		drone.position[0] -= drone.direction[0] * droneSpeed;
 		drone.position[2] -= drone.direction[2] * droneSpeed;
 	}
@@ -345,7 +341,7 @@ void updateCamera(){
 
 	mu.loadIdentity(gmu::PROJECTION);
 
-	if (activeCam == 0 || activeCam == 2 || activeCam == 3) {
+	if (activeCam == 0 || activeCam == 2) {
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
 	} else if (activeCam == 1 ) {
 		float orthoSize = 60.0f;
@@ -383,10 +379,6 @@ void renderSim(void) {
 		obj.position[0] += obj.direction[0] * obj.speed;
 		obj.position[1] += obj.direction[1] * obj.speed;
 		obj.position[2] += obj.direction[2] * obj.speed;
-
-		// Rotate while moving
-		obj.rotationAngle += obj.rotationSpeed;
-		if (obj.rotationAngle > 360.0f) obj.rotationAngle -= 360.0f;
 
 		// Increase speed slightly with play time
 		obj.speed *= 1.0001f;
@@ -450,22 +442,6 @@ if (activeCam == 2) {
 }
 
 //camera for orbit view of the drone
-if (activeCam == 3) { 
-    const float DEG2RAD = 3.1415926f/180.0f;
-
-    // alpha/beta/r are already in your file; just make sure conversions use PI
-    float cx = r * sinf(alpha * DEG2RAD) * cosf(beta * DEG2RAD);
-    float cz = r * cosf(alpha * DEG2RAD) * cosf(beta * DEG2RAD);
-    float cy = r * sinf(beta  * DEG2RAD);
-
-    cams[3].camTarget[0] = drone.position[0];
-    cams[3].camTarget[1] = drone.position[1];
-    cams[3].camTarget[2] = drone.position[2];
-
-    cams[3].camPos[0] = drone.position[0] + cx;
-    cams[3].camPos[1] = drone.position[1] + cy;
-    cams[3].camPos[2] = drone.position[2] + cz;
-}
 
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
@@ -622,28 +598,27 @@ if (activeCam == 3) {
     renderer.renderMesh(data);
     mu.popMatrix(gmu::MODEL);
 
-// --- Draw drone (green cube body + 4 white motors) ---
-mu.pushMatrix(gmu::MODEL);
-mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
+	// --- Draw drone (green cube body + 4 white motors) ---
+	mu.pushMatrix(gmu::MODEL);
+	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
 
-// Body size (keep these up here so we can use them for the pivot)
-const float bodyX = 1.6f, bodyY = 0.25f, bodyZ = 1.6f;
+	// Body size (keep these up here so we can use them for the pivot)
+	const float bodyX = 1.6f, bodyY = 0.25f, bodyZ = 1.6f;
 
-// yaw (from direction)
-float angleY = atan2(drone.direction[0], -drone.direction[2]) * 180.0f / 3.14159f;
+	// yaw (from direction)
+	float angleY = atan2(drone.direction[0], -drone.direction[2]) * 180.0f / 3.14159f;
 
-// >>> move pivot to the cube center, rotate, then move back <<<
-mu.translate(gmu::MODEL,  bodyX * 0.5f, bodyY * 0.5f, bodyZ * 0.5f); // to center
-mu.rotate(   gmu::MODEL,  angleY,       0.0f, 1.0f, 0.0f);            // yaw
-mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
+	// >>> move pivot to the cube center, rotate, then move back <<<
+	mu.translate(gmu::MODEL,  bodyX * 0.5f, bodyY * 0.5f, bodyZ * 0.5f); // to center
+	mu.rotate(   gmu::MODEL,  angleY,       0.0f, 1.0f, 0.0f);            // yaw
+	mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
 
-// 1) BODY (scaled green cube)
+	// 1) BODY (scaled green cube)
 
     mu.pushMatrix(gmu::MODEL);
     mu.scale(gmu::MODEL, bodyX, bodyY, bodyZ);
     mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
     mu.computeNormalMatrix3x3();
-
     
     data.texMode = 1;                // material shading
     data.mesh = &allMeshes.cube;
@@ -1007,7 +982,6 @@ memcpy(droneCube.mat.emissive, emissive, 4*sizeof(float));
 droneCube.mat.shininess = 80.0f;
 droneCube.mat.texCount  = 0;
 
-gDroneBodyMeshID = (int)renderer.myMeshes.size();
 renderer.myMeshes.push_back(droneCube);
 
 
@@ -1023,19 +997,7 @@ memcpy(cyl.mat.specular, specW, 4*sizeof(float));
 cyl.mat.shininess = 120.0f;                   // shiny
 cyl.mat.texCount  = 0;
 
-gMotorMeshID = (int)renderer.myMeshes.size();
-renderer.myMeshes.push_back(cyl);
-
-
-	for (int r = 0; r < rows; ++r) {
-		for (int c = 0; c < cols; ++c) {
-			buildingHeights[r][c] = std::max((rand() % 20) + 5.0f, 10.0f);
-		}
-	}
-
-
-
-	printf("\nNumber of Texture Objects is %d\n\n", renderer.TexObjArray.getNumTextureObjects());
+	renderer.myMeshes.push_back(cyl);
 
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
