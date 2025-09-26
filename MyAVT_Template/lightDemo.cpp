@@ -8,7 +8,7 @@
 //
 // The code comes with no warranties, use it at your own risk.
 // You may use it, or parts of it, wherever you want.
-//
+// 
 // Author: Jo�o Madeiras Pereira
 //
 
@@ -31,8 +31,9 @@
 #include "mathUtility.h"
 #include "model.h"
 #include "texture.h"
-#include <cmath>	 // sinf, cosf, atan2f
+#include <cmath>   // sinf, cosf, atan2f
 #include <algorithm> // if you use std::clamp elsewhere
+
 
 using namespace std;
 
@@ -42,15 +43,15 @@ int WinX = 1024, WinY = 768;
 
 unsigned int FrameCount = 0;
 
-// File with the font
+//File with the font
 const string fontPathFile = "fonts/arial.ttf";
 
-// Object of class gmu (Graphics Math Utility) to manage math and matrix operations
+//Object of class gmu (Graphics Math Utility) to manage math and matrix operations
 gmu mu;
 
-// Object of class renderer to manage the rendering of meshes and ttf-based bitmap text
+//Object of class renderer to manage the rendering of meshes and ttf-based bitmap text
 Renderer renderer;
-
+	
 // Camera Position
 // Follow-camera mouse offsets (degrees)
 
@@ -61,8 +62,8 @@ float followHeight = 10.0f;         // vertical offset
 
 float minPitchDeg = -10.0f, maxPitchDeg = 85.0f;
 // mouse sensitivity & state
-float MOUSE_SENS_YAW = 0.25f;	// deg per pixel
-float MOUSE_SENS_PITCH = 0.25f; // deg per pixel
+float MOUSE_SENS_YAW = 0.25f;    // deg per pixel
+float MOUSE_SENS_PITCH = 0.25f;  // deg per pixel
 float startYawDeg = 0.f, startPitchDeg = 0.f;
 // Zoom sensitivity (world units per pixel of RMB drag)
 float ZOOM_SENS = 0.05f;
@@ -70,32 +71,27 @@ float ZOOM_SENS = 0.05f;
 float sYawDeg = 0.0f, sPitchDeg = 15.0f, sDist = 15.0f; // init to your defaults
 int prevX = 0, prevY = 0;
 
+
 // --- Drone flight state (Task 4)
-float yawDeg = 0.0f;   // heading angle (deg)
-float pitchDeg = 0.0f; // nose up/down (+ = back)
-float rollDeg = 0.0f;  // bank left/right (+ = left)
+float yawDeg   = 0.0f;            // heading angle (deg)
+float pitchDeg = 0.0f;            // nose up/down (+ = back)
+float rollDeg  = 0.0f;            // bank left/right (+ = left)
 
-// --- Forward motion (for UP/DOWN arrows)
-float vFwd = 0.0f;				   // forward speed (units/s)
-const float FWD_MAX_SPEED = 16.0f; // cap (tune)
-const float FWD_GAIN = 3.0f;	   // 1/s — ramp rate to target
-const float PITCH_VIS_MAX = 10.0f; // deg of visual nose tilt at full speed
-
-float velX = 0.0f, velY = 0.0f, velZ = 0.0f; // world velocities
+float velX = 0.0f, velY = 0.0f, velZ = 0.0f;  // world velocities
 
 // Controls & physics
-const float maxTiltDeg = 25.0f;	  // clamp for pitch/roll
-const float tiltStepDeg = 1.5f;	  // degrees added per frame while arrow held
-const float tiltReturnDeg = 1.0f; // auto-level speed per frame when released
-const float accelGain = 0.02f;	  // horizontal accel per frame from tilt
-const float horizDrag = 0.02f;	  // decay per frame (0..1)
-const float vertAccel = 0.01f;	  // W/S vertical accel per frame
-const float vertDrag = 0.01f;	  // vertical decay per frame
-const float maxHorizSpeed = 0.6f; // clamp XY speed
-const float maxVertSpeed = 0.5f;  // clamp Y speed
+const float maxTiltDeg      = 25.0f;     // clamp for pitch/roll
+const float tiltStepDeg     = 1.5f;      // degrees added per frame while arrow held
+const float tiltReturnDeg   = 1.0f;      // auto-level speed per frame when released
+const float accelGain       = 0.02f;     // horizontal accel per frame from tilt
+const float horizDrag       = 0.02f;     // decay per frame (0..1)
+const float vertAccel       = 0.01f;     // W/S vertical accel per frame
+const float vertDrag        = 0.01f;     // vertical decay per frame
+const float maxHorizSpeed   = 0.6f;      // clamp XY speed
+const float maxVertSpeed    = 0.5f;      // clamp Y speed
 
 // Special (arrow) key states
-bool spKeys[256] = {false}; // GLUT special keys (UP/DOWN/LEFT/RIGHT)
+bool spKeys[256] = {false};       // GLUT special keys (UP/DOWN/LEFT/RIGHT)
 
 bool keyPressed[256] = {false};
 
@@ -118,15 +114,14 @@ float yawStep   = 5.0f;  // degrees per A/D press
 float maxSpeed  = 0.5f;  // units per frame
 float maxRot    = 3.0f;  // max yaw rotation speed
 
-struct FlyingObject
-{
-	float position[3];
-	float direction[3];
-	float speed;
-	float rotationAngle;
-	float rotationSpeed;
-	int meshID; // which geometry primitive to use
-	bool active;
+struct FlyingObject {
+    float position[3];
+    float direction[3];
+    float speed;
+    float rotationAngle;
+    float rotationSpeed;
+    int meshID; // which geometry primitive to use
+    bool active;
 };
 
 std::vector<PointLight> pointLights;
@@ -157,41 +152,42 @@ float alpha = 57.0f, beta = 18.0f;
 float r = 45.0f;
 
 // Frame counting and FPS computation
-long myTime, timebase = 0, frame = 0;
+long myTime,timebase = 0,frame = 0;
 char s[32];
 
-bool dayMode = true;						  // Day/night toggle
-float dirLightDir[3] = {-0.5f, -1.0f, -0.3f}; // Direction of sunlight
-float dirLightColor[3] = {1.0f, 1.0f, 0.9f};  // Day color
-// float nightLightColor[3] = { 0.1f, 0.1f, 0.2f }; // Night ambient color
-float nightLightColor[3] = {0.0f, 0.0f, 0.0f};
+bool dayMode = true;                 // Day/night toggle
+float dirLightDir[3] = { -0.5f, -1.0f, -0.3f };  // Direction of sunlight
+float dirLightColor[3] = { 1.0f, 1.0f, 0.9f };   // Day color
+//float nightLightColor[3] = { 0.1f, 0.1f, 0.2f }; // Night ambient color
+float nightLightColor[3] = { 0.0f, 0.0f, 0.0f };
+
 
 float lightPos[4] = {4.0f, 20.0f, 2.0f, 1.0f};
-// float lightPos[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+//float lightPos[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-// Spotlight
+//Spotlight
 bool spotlight_mode = false;
-float coneDir[4] = {0.0f, -0.0f, -1.0f, 0.0f};
+float coneDir[4] = { 0.0f, -0.0f, -1.0f, 0.0f };
 
 SpotLight droneHeadlights[2]; // two headlights
 
-int rows = 7; // number of rows
-int cols = 7; // number of columns
+int rows = 7;           // number of rows
+int cols = 7;           // number of columns
 float gap = 20.0f;
-float offsetX = -((cols - 1) * (10.0f + gap)) / 2.0f; // center grid 10 = buildingWidth
-float offsetZ = -((rows - 1) * (10.0f + gap)) / 2.0f; // 10 = buildingDepth
+float offsetX = -((cols-1) * (10.0f + gap)) / 2.0f; // center grid 10 = buildingWidth 
+float offsetZ = -((rows-1) * (10.0f + gap)) / 2.0f; // 10 = buildingDepth
 
-int numLamps = std::min(rows, cols);
+int numLamps = std::min(rows, cols); 
 float lampHeight = 10.0f;
-float lampOffset = (10.0f + gap) / 2.0f + 2.0f; // push them to the side of diagonal 10 = buildingWidth
+float lampOffset = (10.0f + gap) / 2.0f + 2.0f; // push them to the side of diagonal 10 = buildingWidth 
+
 
 bool fontLoaded = false;
 
-struct Building
-{
-	float x, z;
-	float width, depth;
-	int row, col; // indices no grid
+struct Building {
+    float x, z;
+    float width, depth;
+	int row, col;    // indices no grid
 };
 
 std::vector<Building> buildings;
@@ -199,8 +195,8 @@ std::vector<std::vector<float>> buildingHeights(rows, std::vector<float>(cols));
 
 float buildingW = 10.0f;
 float buildingD = 10.0f;
-float streetWidth = 30.0f; // largura da rua
-float sidewalk = 2.0f;	   // passeios
+float streetWidth = 30.0f;    // largura da rua
+float sidewalk = 2.0f;       // passeios
 
 // central garden define: ocupa N x M células no centro
 int gardenSizeRows = 3; // 2x2 cells
@@ -214,13 +210,13 @@ float gardenCenterZ = 5.0f;
 float gardenW = gardenHalfW * 2.0f;
 float gardenD = gardenHalfD * 2.0f;
 
-bool checkOverlap(const Building &a, const Building &b, float buffer = 1.0f)
-{
-	return !(a.x + a.width / 2 + buffer < b.x - b.width / 2 ||
-			 a.x - a.width / 2 - buffer > b.x + b.width / 2 ||
-			 a.z + a.depth / 2 + buffer < b.z - b.depth / 2 ||
-			 a.z - a.depth / 2 - buffer > b.z + b.depth / 2);
+bool checkOverlap(const Building& a, const Building& b, float buffer = 1.0f) {
+    return !(a.x + a.width/2 + buffer < b.x - b.width/2 ||
+             a.x - a.width/2 - buffer > b.x + b.width/2 ||
+             a.z + a.depth/2 + buffer < b.z - b.depth/2 ||
+             a.z - a.depth/2 - buffer > b.z + b.depth/2);
 }
+
 
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
 
@@ -231,8 +227,8 @@ void timer(int value)
 	std::string s = oss.str();
 	glutSetWindow(WindowHandle);
 	glutSetWindowTitle(s.c_str());
-	FrameCount = 0;
-	glutTimerFunc(1000, timer, 0);
+    FrameCount = 0;
+    glutTimerFunc(1000, timer, 0);
 }
 
 void refresh(int value) // faz RENDER
@@ -247,15 +243,14 @@ void refresh(int value) // faz RENDER
 // Reshape Callback Function
 //
 
-void changeSize(int w, int h)
-{
+void changeSize(int w, int h) {
 	float ratio;
 	// Prevent a divide by zero, when window is too short
-	if (h == 0)
+	if(h == 0)
 		h = 1;
 
 	WinX = w;
-	WinY = h;
+    WinY = h;
 	// set the viewport to be the entire window
 	glViewport(0, 0, w, h);
 	// set the projection matrix
@@ -263,16 +258,14 @@ void changeSize(int w, int h)
 	int m_viewport[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
 	mu.loadIdentity(gmu::PROJECTION);
-	if (activeCam == 0)
-	{
+	if(activeCam == 0){
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
 		printf("entra change size prespectiev");
-	}
-	else
-	{
+	} else {
 		mu.ortho(0, w - 1, 0, h - 1, -1, 1);
 	}
 }
+
 
 // ------------------------------------------------------------
 //
@@ -354,12 +347,9 @@ void updateCameras(){
 
 	mu.loadIdentity(gmu::PROJECTION);
 
-	if (activeCam == 0 || activeCam == 2)
-	{
+	if (activeCam == 0 || activeCam == 2) {
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
-	}
-	else if (activeCam == 1)
-	{
+	} else if (activeCam == 1 ) {
 		float orthoSize = 60.0f;
 		mu.ortho(-orthoSize * ratio, orthoSize * ratio, -orthoSize, orthoSize, -500.0f, 500.0f);
 	}
@@ -401,10 +391,10 @@ void update(){ //UPDATE das posicoes e no render desenha!
 
 void renderSim(void) {
 
-	FrameCount++;
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    FrameCount++;
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
+    renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
 
 	update(); 
 
@@ -420,13 +410,9 @@ void renderSim(void) {
     mu.loadIdentity(gmu::VIEW);
     mu.loadIdentity(gmu::MODEL);
 
-	// --- Set camera/view ---
-	mu.loadIdentity(gmu::VIEW);
-	mu.loadIdentity(gmu::MODEL);
 
 	// ----- UPDATE FLYING OBJECTS -----
-	for (auto &obj : flyingObjects)
-	{
+	for (auto &obj : flyingObjects) {
 		// Move forward
 		obj.position[0] += obj.direction[0] * obj.speed;
 		obj.position[1] += obj.direction[1] * obj.speed;
@@ -436,8 +422,7 @@ void renderSim(void) {
 		obj.speed *= 1.0001f;
 
 		// Respawn if out of visible region
-		if (fabs(obj.position[0]) > 150 || fabs(obj.position[2]) > 150)
-		{
+		if (fabs(obj.position[0]) > 150 || fabs(obj.position[2]) > 150) {
 			obj.position[0] = (rand() % 200 - 100);
 			obj.position[1] = 10.0f + rand() % 30;
 			obj.position[2] = (rand() % 200 - 100);
@@ -455,13 +440,13 @@ void renderSim(void) {
 	//camera for orbit view of the drone
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
-			  cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0, 1, 0);
+	cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0,1,0);
 
-	// Directional light
-	float dirLightWorld[4] = {0.5f, -0.7f, 0.3f, 0.0f};
-	float dirLightEye[4];
-	mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
-	float dirLightEye3[3] = {dirLightEye[0], dirLightEye[1], dirLightEye[2]};
+    // Directional light
+    float dirLightWorld[4] = { 0.5f, -0.7f, 0.3f, 0.0f };
+    float dirLightEye[4];
+    mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
+    float dirLightEye3[3] = { dirLightEye[0], dirLightEye[1], dirLightEye[2] };
 	renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
 
 	dataMesh data;
@@ -471,14 +456,13 @@ void renderSim(void) {
 	int lampCount = 6;
 	float lampRadius = std::max(gardenW, gardenD) / 2.0f; // postes ligeiramente fora do jardim
 
-	for (int i = 0; i < lampCount; ++i)
-	{
+	for (int i = 0; i < lampCount; ++i) {
 		float ang = (2.0f * 3.14159f) * i / lampCount;
 		float lx = gardenCenterX + lampRadius * cos(ang);
 		float lz = gardenCenterZ + lampRadius * sin(ang);
 		float ly = lampHeight;
 
-		float worldPos[4] = {lx, ly, lz, 1.0f};
+		float worldPos[4] = { lx, ly, lz, 1.0f };
 		float eyePos[4];
 		mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
 
@@ -486,22 +470,22 @@ void renderSim(void) {
 		lamp.LocalPos[0] = eyePos[0];
 		lamp.LocalPos[1] = eyePos[1];
 		lamp.LocalPos[2] = eyePos[2];
-		lamp.Color[0] = 3.0f;
+		lamp.Color[0] = 3.0f; 
 		lamp.Color[1] = 2.7f;
 		lamp.Color[2] = 2.1f;
 		lamp.atten.constant = 1.0f;
-		lamp.atten.linear = 0.02f;
-		lamp.atten.exp = 0.02f;
+		lamp.atten.linear   = 0.02f;
+		lamp.atten.exp      = 0.02f;
 		pointLights.push_back(lamp);
 
-		// LampPost
+		//LampPost
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, lx, 0, lz);
 		mu.scale(gmu::MODEL, 0.25f, ly, 0.25f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 		data.mesh = &allMeshes.cube; // cube
-		data.texMode = 4;			 // metal
+		data.texMode = 4; // metal
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -528,8 +512,8 @@ void renderSim(void) {
 
 	// --- Headlight offsets in LOCAL space of the cube ---
 	float localHeadlightOffsets[2][4] = {
-		{-0.5f, 0.0f, 1.0f, 1.0f}, // left headlight
-		{0.5f, 0.0f, 1.0f, 1.0f}   // right headlight
+		{ -0.5f,  0.0f,  1.0f, 1.0f },  // left headlight
+		{  0.5f,  0.0f,  1.0f, 1.0f }   // right headlight
 	};
 
 	// Compute drone's rotation matrix
@@ -539,8 +523,7 @@ void renderSim(void) {
 	mu.rotate(gmu::MODEL, angle_Y * 180.0f / 3.14159f, 0.0f, 1.0f, 0.0f);
 
 	// For each headlight
-	for (int i = 0; i < 2; i++)
-	{
+	for (int i = 0; i < 2; i++) {
 		float worldPos[4];
 		mu.multMatrixPoint(gmu::MODEL, localHeadlightOffsets[i], worldPos);
 
@@ -553,7 +536,7 @@ void renderSim(void) {
 		droneHeadlights[i].Position[2] = eyePos[2];
 
 		// Forward direction of drone (local Z axis)
-		float localDir[4] = {0.0f, 0.0f, 1.0f, 0.0f};
+		float localDir[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
 		float worldDir[4];
 		mu.multMatrixPoint(gmu::MODEL, localDir, worldDir);
 
@@ -568,17 +551,16 @@ void renderSim(void) {
 		droneHeadlights[i].Color[1] = 1.0f;
 		droneHeadlights[i].Color[2] = 0.9f;
 		droneHeadlights[i].atten.constant = 1.0f;
-		droneHeadlights[i].atten.linear = 0.1f;
-		droneHeadlights[i].atten.exp = 0.01f;
+		droneHeadlights[i].atten.linear   = 0.1f;
+		droneHeadlights[i].atten.exp      = 0.01f;
 		droneHeadlights[i].Cutoff = cosf(20.0f * 3.14159f / 180.0f);
 	}
 	mu.popMatrix(gmu::MODEL);
 
 	renderer.setDroneSpotLights(droneHeadlights, 2, spotlight_mode);
 
-	// ----- RENDER FLYING OBJECTS -----
-	for (auto &obj : flyingObjects)
-	{
+		// ----- RENDER FLYING OBJECTS -----
+	for (auto &obj : flyingObjects) {
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, obj.position[0], obj.position[1], obj.position[2]);
 		mu.rotate(gmu::MODEL, obj.rotationAngle, 0.0f, 1.0f, 0.0f);
@@ -596,20 +578,20 @@ void renderSim(void) {
 		mu.popMatrix(gmu::MODEL);
 	}
 
-	// --- Draw floor ---
-	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
-	mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
-	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-	mu.computeNormalMatrix3x3();
+    // --- Draw floor ---
+    mu.pushMatrix(gmu::MODEL);
+    mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
+    mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
+    mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+    mu.computeNormalMatrix3x3();
 
-	data.mesh = &allMeshes.quad;
-	data.texMode = 2;
-	data.vm = mu.get(gmu::VIEW_MODEL);
-	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-	data.normal = mu.getNormalMatrix();
-	renderer.renderMesh(data);
-	mu.popMatrix(gmu::MODEL);
+    data.mesh = &allMeshes.quad;
+    data.texMode = 2;
+    data.vm = mu.get(gmu::VIEW_MODEL);
+    data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+    data.normal = mu.getNormalMatrix();
+    renderer.renderMesh(data);
+    mu.popMatrix(gmu::MODEL);
 
 	// --- Draw drone (green cube body + 4 white motors) ---
 	mu.pushMatrix(gmu::MODEL);
@@ -618,27 +600,30 @@ void renderSim(void) {
 	// Body size (keep these up here so we can use them for the pivot)
 	const float bodyX = 1.6f, bodyY = 0.25f, bodyZ = 1.6f;
 
-	// Use yawDeg directly (same as angleY you computed)
-	mu.translate(gmu::MODEL, bodyX * 0.5f, bodyY * 0.5f, bodyZ * 0.5f);	   // to center
-	mu.rotate(gmu::MODEL, yawDeg, 0.0f, 1.0f, 0.0f);					   // yaw (A/D)
-	mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f);					   // slight nose tilt (UP/DOWN)
-	mu.translate(gmu::MODEL, -bodyX * 0.5f, -bodyY * 0.5f, -bodyZ * 0.5f); // back
+	// yaw (from direction)
+	float angleY = atan2(drone.direction[0], -drone.direction[2]) * 180.0f / 3.14159f;
+
+	// >>> move pivot to the cube center, rotate, then move back <<<
+	mu.translate(gmu::MODEL,  bodyX * 0.5f, bodyY * 0.5f, bodyZ * 0.5f); // to center
+	mu.rotate(   gmu::MODEL,  angleY,       0.0f, 1.0f, 0.0f);            // yaw
+	mu.translate(gmu::MODEL, -bodyX * 0.5f,-bodyY * 0.5f,-bodyZ * 0.5f);  // back
 
 	// 1) BODY (scaled green cube)
 
-	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, bodyX, bodyY, bodyZ);
-	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-	mu.computeNormalMatrix3x3();
+    mu.pushMatrix(gmu::MODEL);
+    mu.scale(gmu::MODEL, bodyX, bodyY, bodyZ);
+    mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+    mu.computeNormalMatrix3x3();
+    
+    data.texMode = 1;                // material shading
+    data.mesh = &allMeshes.cube;
+    data.texMode = 4;
+    data.vm = mu.get(gmu::VIEW_MODEL);
+    data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+    data.normal = mu.getNormalMatrix();
+    renderer.renderMesh(data);
+    mu.popMatrix(gmu::MODEL);
 
-	data.texMode = 1; // material shading
-	data.mesh = &allMeshes.cube;
-	data.texMode = 4;
-	data.vm = mu.get(gmu::VIEW_MODEL);
-	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-	data.normal = mu.getNormalMatrix();
-	renderer.renderMesh(data);
-	mu.popMatrix(gmu::MODEL);
 
 	// --- Draw streets (as long quads with asphalt texture) ---
 	/* mu.pushMatrix(gmu::MODEL);
@@ -661,33 +646,32 @@ void renderSim(void) {
 	}
 	mu.popMatrix(gmu::MODEL); */
 
-	// 2) MOTORS (4 short white cylinders) — attached to the same parent frame
+// 2) MOTORS (4 short white cylinders) — attached to the same parent frame
 
-	const float motorR = 0.22f; // radius
-	const float motorH = 0.15f; // height
+    const float motorR = 0.22f;   // radius
+    const float motorH = 0.15f;   // height
 
-	// TOP of the cube is at Y = bodyY because cube vertices are 0..1
-	const float motorY = bodyY + motorH * 0.5f; // center sits just above the top face
+    // TOP of the cube is at Y = bodyY because cube vertices are 0..1
+    const float motorY = bodyY + motorH * 0.5f;   // center sits just above the top face
 
-	// If you want the motors TANGENT to the two edges (fully on top surface):
-	auto placeMotor = [&](float x, float z)
-	{
-		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, x, motorY, z);
-		mu.scale(gmu::MODEL, motorR, motorH, motorR); // cylinder axis = Y
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
+    // If you want the motors TANGENT to the two edges (fully on top surface):
+    auto placeMotor = [&](float x, float z) {
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, x, motorY, z);
+        mu.scale(gmu::MODEL, motorR, motorH, motorR);  // cylinder axis = Y
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
 
-		data.mesh = &allMeshes.cube;
-		data.texMode = 1;
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
-		mu.popMatrix(gmu::MODEL);
-	};
+        data.mesh = &allMeshes.cube;
+        data.texMode = 1;
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
+        mu.popMatrix(gmu::MODEL);
+    };
 
-	placeMotor(0.f, 0.f);
+    placeMotor(0.f, 0.f);
 	placeMotor(bodyX, 0.f);
 	placeMotor(0.f, bodyZ);
 	placeMotor(bodyX, bodyZ);
@@ -700,7 +684,7 @@ void renderSim(void) {
 		float streetLenX = cols * (buildingW + gap);
 		mu.translate(gmu::MODEL, 5.0f, 0.2f, 0.0f);
 		mu.scale(gmu::MODEL, streetWidth, 1.0f, streetLenX);
-		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
+		mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 		data.mesh = &allMeshes.quad;
@@ -711,13 +695,13 @@ void renderSim(void) {
 		renderer.renderMesh(data);
 		mu.loadIdentity(gmu::MODEL);
 	}
-	mu.popMatrix(gmu::MODEL);
+	mu.popMatrix(gmu::MODEL); 
 
 	// --- Draw garden (central park) ---
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
 	mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
-	mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
+	mu.rotate(gmu::MODEL,-90.0f, 1.0f, 0.0f, 0.0f);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 	mu.computeNormalMatrix3x3();
 	data.mesh = &allMeshes.quad;
@@ -727,13 +711,12 @@ void renderSim(void) {
 	data.normal = mu.getNormalMatrix();
 	renderer.renderMesh(data);
 	mu.popMatrix(gmu::MODEL);
-
+ 
 	// place some low 'tree' cones around garden
-	for (int t = 0; t < 6; ++t)
-	{
+	for (int t = 0; t < 6; ++t) {
 		float ang = (2.0f * 3.14159f) * t / 6.0f;
-		float rx = gardenCenterX + (gardenW / 2.2f - 4.0f) * cos(ang);
-		float rz = gardenCenterZ + (gardenD / 2.2f - 4.0f) * sin(ang);
+		float rx = gardenCenterX + (gardenW/2.2f - 4.0f) * cos(ang);
+		float rz = gardenCenterZ + (gardenD/2.2f - 4.0f) * sin(ang);
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, rx, 0, rz);
 		mu.scale(gmu::MODEL, 1.5f, 4.0f, 1.5f);
@@ -750,9 +733,8 @@ void renderSim(void) {
 	}
 
 	// --- Draw buildings using buildings vector ---
-	for (const Building &b : buildings)
-	{
-		float h = buildingHeights[b.row][b.col];
+	for (const Building &b : buildings) {
+		float h = buildingHeights[b.row][b.col]; 
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, b.x, 0, b.z);
 
@@ -770,20 +752,20 @@ void renderSim(void) {
 		mu.popMatrix(gmu::MODEL);
 	}
 
-	/**
-	   // Camera position: fixed behind and above drone
-		cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
-		cams[2].camPos[1] = drone.position[1] + followHeight;
-		cams[2].camPos[2] = drone.position[2] - drone.direction[2] * followDistance;
+/** 
+   // Camera position: fixed behind and above drone
+	cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
+	cams[2].camPos[1] = drone.position[1] + followHeight;
+	cams[2].camPos[2] = drone.position[2] - drone.direction[2] * followDistance;
 
-		// Camera target: in front of the drone (not at the drone itself)
-		float lookAhead = 50.0f; // how far forward camera looks
-		cams[2].camTarget[0] = drone.position[0] + drone.direction[0] * lookAhead;
-		cams[2].camTarget[1] = drone.position[1];
-		cams[2].camTarget[2] = drone.position[2] + drone.direction[2] * lookAhead;
+	// Camera target: in front of the drone (not at the drone itself)
+	float lookAhead = 50.0f; // how far forward camera looks
+	cams[2].camTarget[0] = drone.position[0] + drone.direction[0] * lookAhead;
+	cams[2].camTarget[1] = drone.position[1];
+	cams[2].camTarget[2] = drone.position[2] + drone.direction[2] * lookAhead;
 
-	**/
-	glutSwapBuffers();
+**/
+    glutSwapBuffers();
 }
 
 // ------------------------------------------------------------
@@ -985,8 +967,8 @@ void processMouseMotion(int xx, int yy) {
     }
 }
 
-void mouseWheel(int wheel, int direction, int x, int y)
-{
+
+void mouseWheel(int wheel, int direction, int x, int y) {
 
 	r += direction * 0.1f;
 	if (r < 0.1f)
@@ -996,8 +978,8 @@ void mouseWheel(int wheel, int direction, int x, int y)
 	camZ = r * cos(alpha * 3.14f / 180.0f) * cos(beta * 3.14f / 180.0f);
 	camY = r *   						     sin(beta * 3.14f / 180.0f); */
 
-	//  uncomment this if not using an idle or refresh func
-	//	glutPostRedisplay();
+//  uncomment this if not using an idle or refresh func
+//	glutPostRedisplay();
 }
 
 //
@@ -1006,33 +988,34 @@ void mouseWheel(int wheel, int direction, int x, int y)
 
 void buildScene()
 {
-	// Texture Object definition
+	//Texture Object definition
 	renderer.TexObjArray.texture2D_Loader("assets/pavement.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/checker.png");
 	renderer.TexObjArray.texture2D_Loader("assets/lightwood.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/grass.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/road.tga");
+	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");  
+	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");  
+	renderer.TexObjArray.texture2D_Loader("assets/grass.tga");  
+	renderer.TexObjArray.texture2D_Loader("assets/road.tga"); 
 
-	// Scene geometry with triangle meshes
+	//Scene geometry with triangle meshes
 
 	MyMesh amesh;
 
-	float amb[] = {0.2f, 0.15f, 0.1f, 1.0f};
-	float diff[] = {0.8f, 0.6f, 0.4f, 1.0f};
-	float spec[] = {0.8f, 0.8f, 0.8f, 1.0f};
+	float amb[] = { 0.2f, 0.15f, 0.1f, 1.0f };
+	float diff[] = { 0.8f, 0.6f, 0.4f, 1.0f };
+	float spec[] = { 0.8f, 0.8f, 0.8f, 1.0f };
 
-	float amb1[] = {0.3f, 0.0f, 0.0f, 1.0f};
-	float diff1[] = {0.8f, 0.1f, 0.1f, 1.0f};
-	float spec1[] = {0.3f, 0.3f, 0.3f, 1.0f};
+	float amb1[] = { 0.3f, 0.0f, 0.0f, 1.0f };
+	float diff1[] = { 0.8f, 0.1f, 0.1f, 1.0f };
+	float spec1[] = { 0.3f, 0.3f, 0.3f, 1.0f };
 
-	float ambBulb[] = {0.2f, 0.2f, 0.0f, 1.0f};	 // slight yellow base
-	float diffBulb[] = {0.8f, 0.8f, 0.2f, 1.0f}; // bright yellow diffuse
-	float specBulb[] = {0.5f, 0.5f, 0.3f, 1.0f}; // soft highlight
-	float emisBulb[] = {1.0f, 1.0f, 0.2f, 1.0f}; // strong emissive glow (neon!)
+	float ambBulb[]  = {0.2f, 0.2f, 0.0f, 1.0f};   // slight yellow base
+	float diffBulb[] = {0.8f, 0.8f, 0.2f, 1.0f};   // bright yellow diffuse
+	float specBulb[] = {0.5f, 0.5f, 0.3f, 1.0f};   // soft highlight
+	float emisBulb[] = {1.0f, 1.0f, 0.2f, 1.0f};   // strong emissive glow (neon!)
 
-	float emissive[] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+	float emissive[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	float shininess = 100.0f;
 	int texcount = 0;
 
@@ -1072,14 +1055,14 @@ void buildScene()
 	allMeshes.cone.mat.shininess = shininess;
 	allMeshes.cone.mat.texCount = texcount;
 
+
 	// ----- INITIALIZE FLYING OBJECTS -----
-	for (int i = 0; i < 10; i++)
-	{
+	for (int i = 0; i < 10; i++) {
 		FlyingObject obj;
 
 		// random spawn position in XZ plane
 		obj.position[0] = (rand() % 200 - 100);
-		obj.position[1] = 10.0f + rand() % 30; // altitude between 10–40
+		obj.position[1] = 10.0f + rand() % 30;   // altitude between 10–40
 		obj.position[2] = (rand() % 200 - 100);
 
 		// random direction in XZ plane
@@ -1088,10 +1071,10 @@ void buildScene()
 		obj.direction[1] = 0.0f;
 		obj.direction[2] = sin(angle);
 
-		obj.speed = 0.05f + (rand() % 10) * 0.01f; // 0.05 – 0.15
+		obj.speed = 0.05f + (rand() % 10) * 0.01f;   // 0.05 – 0.15
 		obj.rotationAngle = 0.0f;
-		obj.rotationSpeed = 1.0f + (rand() % 5); // 1 – 5 degrees per frame
-		obj.meshID = 2 + (i % 2);				 // 2 = sphere, 3 = cone
+		obj.rotationSpeed = 1.0f + (rand() % 5);     // 1 – 5 degrees per frame
+		obj.meshID = 2 + (i % 2);                    // 2 = sphere, 3 = cone
 		obj.active = true;
 
 		flyingObjects.push_back(obj);
@@ -1099,44 +1082,37 @@ void buildScene()
 
 	// Clear and fill building vector
 	buildings.clear();
-	for (int r = 0; r < rows; ++r)
-	{
-		for (int c = 0; c < cols; ++c)
-		{
+	for (int r = 0; r < rows; ++r) {
+		for (int c = 0; c < cols; ++c) {
 			// compute standard position center for this grid cell
 			float x = offsetX + c * (buildingW + gap);
 			float z = offsetZ + r * (buildingD + gap);
 
 			bool isStreet = false;
 			// create vertical street down the middle
-			if (c == cols / 2)
-				isStreet = true;
+			if (c == cols/2) isStreet = true;
 			// create horizontal street across middle
-			if (r == rows / 2)
-				isStreet = true;
+			if (r == rows/2) isStreet = true;
 
 			// carve out the central garden area (a rectangle around center)
-			int gardenRowStart = rows / 2 - gardenSizeRows / 2;
-			int gardenRowEnd = gardenRowStart + gardenSizeRows - 1;
-			int gardenColStart = cols / 2 - gardenSizeCols / 2;
-			int gardenColEnd = gardenColStart + gardenSizeCols - 1;
+			int gardenRowStart = rows/2 - gardenSizeRows/2;
+			int gardenRowEnd   = gardenRowStart + gardenSizeRows - 1;
+			int gardenColStart = cols/2 - gardenSizeCols/2;
+			int gardenColEnd   = gardenColStart + gardenSizeCols - 1;
 			bool isGardenCell = (r >= gardenRowStart && r <= gardenRowEnd && c >= gardenColStart && c <= gardenColEnd);
 
-			if (!isStreet && !isGardenCell)
-			{
+			if (!isStreet && !isGardenCell) {
 				Building b;
 				b.x = x;
 				b.z = z;
 				b.width = buildingW;
 				b.depth = buildingD;
 				b.row = r;
-				b.col = c;
+    			b.col = c;
 				buildings.push_back(b);
 
 				buildingHeights[r][c] = std::max((rand() % 20) + 8.0f, 10.0f);
-			}
-			else
-			{
+			} else {
 				// leave empty: street or garden
 				buildingHeights[r][c] = 0.0f;
 			}
@@ -1158,6 +1134,7 @@ void buildScene()
 	cams[1].camPos[1] = 200.0;
 	cams[1].camPos[2] = 0.33;
 	cams[1].type = 1;
+
 }
 
 // ------------------------------------------------------------
@@ -1165,30 +1142,29 @@ void buildScene()
 // Main function
 //
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 
-	//  GLUT initialization
+//  GLUT initialization
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA | GLUT_MULTISAMPLE);
+	glutInitDisplayMode(GLUT_DEPTH|GLUT_DOUBLE|GLUT_RGBA|GLUT_MULTISAMPLE);
 
-	glutInitContextVersion(4, 3);
-	glutInitContextProfile(GLUT_CORE_PROFILE);
+	glutInitContextVersion (4, 3);
+	glutInitContextProfile (GLUT_CORE_PROFILE );
 	glutInitContextFlags(GLUT_FORWARD_COMPATIBLE | GLUT_DEBUG);
 
-	glutInitWindowPosition(100, 100);
+	glutInitWindowPosition(100,100);
 	glutInitWindowSize(WinX, WinY);
 	WindowHandle = glutCreateWindow(CAPTION);
 
-	//  Callback Registration
+//  Callback Registration
 	glutDisplayFunc(renderSim);
 	glutReshapeFunc(changeSize);
 
 	glutTimerFunc(0, timer, 0);
-	glutIdleFunc(renderSim); // Use it for maximum performance
-	// glutTimerFunc(0, refresh, 0);    //use it to to get 60 FPS whatever
+	glutIdleFunc(renderSim);  // Use it for maximum performance
+	//glutTimerFunc(0, refresh, 0);    //use it to to get 60 FPS whatever
 
-	//	Mouse and Keyboard Callbacks
+//	Mouse and Keyboard Callbacks
 	glutKeyboardFunc(processKeys);
 	glutKeyboardUpFunc(keyUp);
 	glutSpecialFunc(processSpecialDown);
@@ -1199,10 +1175,10 @@ int main(int argc, char **argv)
 	glutMouseWheelFunc ( mouseWheel ) ;
 	
 
-	//	return from main loop
+//	return from main loop
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 
-	//	Init GLEW
+//	Init GLEW
 	glewExperimental = GL_TRUE;
 	glewInit();
 
@@ -1212,10 +1188,10 @@ int main(int argc, char **argv)
 	glEnable(GL_MULTISAMPLE);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-	printf("Vendor: %s\n", glGetString(GL_VENDOR));
-	printf("Renderer: %s\n", glGetString(GL_RENDERER));
-	printf("Version: %s\n", glGetString(GL_VERSION));
-	printf("GLSL: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+	printf ("Vendor: %s\n", glGetString (GL_VENDOR));
+	printf ("Renderer: %s\n", glGetString (GL_RENDERER));
+	printf ("Version: %s\n", glGetString (GL_VERSION));
+	printf ("GLSL: %s\n", glGetString (GL_SHADING_LANGUAGE_VERSION));
 
 	/* Initialization of DevIL */
 	if (ilGetInteger(IL_VERSION_NUM) < IL_VERSION)
@@ -1227,12 +1203,15 @@ int main(int argc, char **argv)
 
 	buildScene();
 
-	if (!renderer.setRenderMeshesShaderProg("shaders/mesh.vert", "shaders/mesh.frag") ||
+	if(!renderer.setRenderMeshesShaderProg("shaders/mesh.vert", "shaders/mesh.frag") || 
 		!renderer.setRenderTextShaderProg("shaders/ttf.vert", "shaders/ttf.frag"))
-		return (1);
+	return(1);
 
 	//  GLUT main loop
 	glutMainLoop();
 
-	return (0);
+	return(0);
 }
+
+
+
