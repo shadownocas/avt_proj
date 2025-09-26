@@ -102,6 +102,8 @@ struct Drone
 	float direction[3] = {0.0f, 0.0f, -1.0f};	// pointing along -Z initially
 	float speed;
 	float yaw;
+	AABB aabb;
+	AABB worldAABB;
 };
 
 struct FlyingObject
@@ -113,6 +115,8 @@ struct FlyingObject
 	float rotationSpeed;
 	int meshID; // which geometry primitive to use
 	bool active;
+	AABB aabb;
+	AABB worldAABB;
 };
 
 std::vector<PointLight> pointLights;
@@ -185,6 +189,8 @@ struct Building
 	float x, z;
 	float width, depth;
 	int row, col; // indices no grid
+	AABB aabb;
+	AABB worldAABB;
 };
 
 std::vector<Building> buildings;
@@ -270,6 +276,56 @@ void changeSize(int w, int h)
 	{
 		mu.ortho(0, w - 1, 0, h - 1, -1, 1);
 	}
+}
+
+AABB updateGlobalAABB(AABB result, float* modelMatrix) {
+    float globalMin[3] = { 100000000000, 100000000000, 100000000000 };
+    float globalMax[3] = { -100000000000, -100000000000, -100000000000 };
+	AABB obj = result;  
+	//printf("obj updateGlobalAABB aabb min x: %f y: %f z: %f\n", obj.aabbmin[0], obj.aabbmin[1], obj.aabbmin[2]);
+	//printf("updateGlobalAABB print aabb max x: %f y: %f z: %f\n", obj.aabbmax[0], obj.aabbmax[1], obj.aabbmax[2]);
+	//ObjCollision objCollision; // Copy original collision data
+    for (int i = 0; i < 8; i++) {
+        float* c = obj.corners[i];
+
+        // Matrix × Vector (column-major order)
+        float x = modelMatrix[0] * c[0] + modelMatrix[4] * c[1] + modelMatrix[8]  * c[2] + modelMatrix[12];
+        float y = modelMatrix[1] * c[0] + modelMatrix[5] * c[1] + modelMatrix[9]  * c[2] + modelMatrix[13];
+        float z = modelMatrix[2] * c[0] + modelMatrix[6] * c[1] + modelMatrix[10] * c[2] + modelMatrix[14];
+        float w = modelMatrix[3] * c[0] + modelMatrix[7] * c[1] + modelMatrix[11] * c[2] + modelMatrix[15];
+
+        if (w != 0.0f) {
+            x /= w;
+            y /= w;
+            z /= w;
+        }
+
+        obj.corners[i][0] = x;
+        obj.corners[i][1] = y;
+        obj.corners[i][2] = z;
+
+        // Update global min
+        globalMin[0] = std::min(globalMin[0], x);
+        globalMin[1] = std::min(globalMin[1], y);
+        globalMin[2] = std::min(globalMin[2], z);
+
+        // Update global max
+        globalMax[0] = std::max(globalMax[0], x);
+        globalMax[1] = std::max(globalMax[1], y);
+        globalMax[2] = std::max(globalMax[2], z);
+    }
+
+    // Save results
+    obj.aabbmin[0] = globalMin[0];
+    obj.aabbmin[1] = globalMin[1];
+    obj.aabbmin[2] = globalMin[2];
+
+    obj.aabbmax[0] = globalMax[0];
+    obj.aabbmax[1] = globalMax[1];
+    obj.aabbmax[2] = globalMax[2];
+	//printf("aabbUPDATEDDD min x: %f y: %f z: %f\n", obj.aabbmin[0], obj.aabbmin[1], obj.aabbmin[2]);
+
+    return obj;
 }
 
 // ------------------------------------------------------------
@@ -397,6 +453,14 @@ void updateCamera2() //dt needed??
     cams[2].camTarget[2] = pivotZ;
 }
 
+bool checkAABBCollision(const float minA[3], const float maxA[3], const float minB[3], const float maxB[3]) {
+    for (int i = 0; i < 3; i++) {
+        if (maxA[i] < minB[i] || minA[i] > maxB[i]) {
+            return false; 
+        }
+    }
+    return true; //collsionnn
+}
 
 void update(){ //UPDATE das posicoes e no render desenha!
 	 // Update drone movement
@@ -411,6 +475,18 @@ void update(){ //UPDATE das posicoes e no render desenha!
 		dt = 0.001f;
 	if (dt > 0.033f)
 		dt = 0.033f;
+	
+	for (Building &b : buildings) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
+			printf("COLLISION with BUILDING object!");
+		}
+	}
+
+	for (FlyingObject &obj : flyingObjects) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+			printf("COLLISION with FLYING object!");
+		}
+	}
 
     updateDrone(dt);
 	updateCamera2();
@@ -640,13 +716,18 @@ void renderSim(void)
 	mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f);					   // slight nose tilt (UP/DOWN)
 	mu.translate(gmu::MODEL, -bodyX * 0.5f, -bodyY * 0.5f, -bodyZ * 0.5f); // back
 
-	// 1) BODY (scaled green cube)
-
 	mu.pushMatrix(gmu::MODEL);
 	mu.scale(gmu::MODEL, bodyX, bodyY, bodyZ);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 	mu.computeNormalMatrix3x3();
 
+	float* modelMatrix = mu.get(gmu::MODEL);
+	AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix); //WORLD SPACEE
+	//printf("Obj collision aabbmin: %f, %f, %f\n", objCollision.aabbmin[0], objCollision.aabbmin[1], objCollision.aabbmin[2]);
+	drone.worldAABB = aabbBox;
+	/* printf("AABB min DO DRONE:  [%f, %f, %f]\n", drone.worldAABB.aabbmin[0], drone.worldAABB.aabbmin[1], drone.worldAABB.aabbmin[2]);
+    printf("AABB max DRONE:  [%f, %f, %f]\n", drone.worldAABB.aabbmax[0], drone.worldAABB.aabbmax[1], drone.worldAABB.aabbmax[2]);
+ */
 	data.texMode = 1; // material shading
 	data.mesh = &allMeshes.cube;
 	data.texMode = 4;
@@ -766,7 +847,7 @@ void renderSim(void)
 	}
 
 	// --- Draw buildings using buildings vector ---
-	for (const Building &b : buildings)
+	for (Building &b : buildings)
 	{
 		float h = buildingHeights[b.row][b.col];
 		mu.pushMatrix(gmu::MODEL);
@@ -775,6 +856,16 @@ void renderSim(void)
 		mu.scale(gmu::MODEL, b.width, h, b.depth);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
+
+		 // Compute world-space AABB
+		float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(b.aabb, modelMatrix); //WORLD SPACEE
+		//printf("Obj collision aabbmin: %f, %f, %f\n", objCollision.aabbmin[0], objCollision.aabbmin[1], objCollision.aabbmin[2]);
+		b.worldAABB = aabbBox;
+
+		/* printf("AABB min DO building:  [%f, %f, %f]\n", b.worldAABB.aabbmin[0], b.worldAABB.aabbmin[1], b.worldAABB.aabbmin[2]);
+    	printf("AABB max building:  [%f, %f, %f]\n", b.worldAABB.aabbmax[0], b.worldAABB.aabbmax[1], b.worldAABB.aabbmax[2]);
+ */
 
 		data.mesh = &allMeshes.cube;
 		data.texMode = 3;
@@ -1041,7 +1132,9 @@ void buildScene()
 		obj.rotationSpeed = 1.0f + (rand() % 5); // 1 – 5 degrees per frame
 		obj.meshID = 2 + (i % 2);				 // 2 = sphere, 3 = cone
 		obj.active = true;
-
+		obj.aabb = allMeshes.cube.aabb;
+		/* printf("AABB min:  [%f, %f, %f]\n", obj.aabb.aabbmin[0], obj.aabb.aabbmin[1], obj.aabb.aabbmin[2]);
+    	printf("AABB max:  [%f, %f, %f]\n", obj.aabb.aabbmax[0], obj.aabb.aabbmax[1], obj.aabb.aabbmax[2]); */
 		flyingObjects.push_back(obj);
 	}
 
@@ -1079,6 +1172,8 @@ void buildScene()
 				b.depth = buildingD;
 				b.row = r;
 				b.col = c;
+				b.aabb = allMeshes.cube.aabb;
+
 				buildings.push_back(b);
 
 				buildingHeights[r][c] = std::max((rand() % 20) + 8.0f, 10.0f);
@@ -1098,6 +1193,9 @@ void buildScene()
 	drone.direction[0] = 0.0f;
 	drone.direction[1] = 0.0f;
 	drone.direction[2] = -1.0f;
+	drone.aabb = allMeshes.cube.aabb; //cube
+	/* printf("AABB min:  [%f, %f, %f]\n", drone.aabb.aabbmin[0], drone.aabb.aabbmin[1], drone.aabb.aabbmin[2]);
+    printf("AABB max:  [%f, %f, %f]\n", drone.aabb.aabbmax[0], drone.aabb.aabbmax[1], drone.aabb.aabbmax[2]); */
 
 	cams[0].camPos[1] = 200.0;
 	cams[0].camPos[0] = 0.0;

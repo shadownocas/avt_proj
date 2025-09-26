@@ -1,4 +1,3 @@
-
 #ifndef _model_
 #define _model_
 
@@ -14,16 +13,26 @@ struct Material{
 	float shininess;
 	int texCount;
 };
+
+struct AABB {
+    float aabbmin[3];
+    float aabbmax[3];
+    float corners[8][3];
+};
+
 // A model can be made of many meshes. Each is stored  in the following structure
 struct MyMesh {
-		GLuint vao;
-		GLuint texUnits[MAX_TEXTURES];
-		texType texTypes[4];
-		float transform[16];
-		GLuint numIndexes;
-		unsigned int type;
-		struct Material mat;
-	};
+	GLuint vao;
+	GLuint texUnits[MAX_TEXTURES];
+	texType texTypes[4];
+	float transform[16];
+	GLuint numIndexes;
+	unsigned int type;
+	struct Material mat;
+
+	// Store positions for CPU-side AABB calculations
+    AABB aabb;
+};
 
 struct MeshCollection {
     MyMesh quad;

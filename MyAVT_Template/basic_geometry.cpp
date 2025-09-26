@@ -99,6 +99,21 @@ MyMesh createCube() {
 	glBindVertexArray(0);
 	
 	amesh.type = GL_TRIANGLES;
+
+	amesh.aabb.aabbmin[0] = 0;
+    amesh.aabb.aabbmin[1] = 0;
+    amesh.aabb.aabbmin[2] = 0;
+
+    amesh.aabb.aabbmax[0] =  1;
+    amesh.aabb.aabbmax[1] =  1;
+    amesh.aabb.aabbmax[2] =  1;
+
+    for (int i = 0; i < 8; i++) {
+        amesh.aabb.corners[i][0] = (i & 1) ? amesh.aabb.aabbmax[0] : amesh.aabb.aabbmin[0];
+        amesh.aabb.corners[i][1] = (i & 2) ? amesh.aabb.aabbmax[1] : amesh.aabb.aabbmin[1];
+        amesh.aabb.corners[i][2] = (i & 4) ? amesh.aabb.aabbmax[2] : amesh.aabb.aabbmin[2];
+    }
+
 	return(amesh);
 }
 
@@ -106,6 +121,16 @@ MyMesh createCube() {
 MyMesh createSphere(float radius, int divisions) {
 
 	float *p = circularProfile(-3.14159f/2.0f, 3.14159f/2.0f, radius, divisions);
+	MyMesh amesh = computeVAO(divisions+1, p+2, p, divisions*2, 0.0f);
+
+	amesh.aabb.aabbmin[0] = amesh.aabb.aabbmin[1] = amesh.aabb.aabbmin[2] = -radius;
+    amesh.aabb.aabbmax[0] = amesh.aabb.aabbmax[1] = amesh.aabb.aabbmax[2] = radius;
+	for (int i = 0; i < 8; i++) {
+        amesh.aabb.corners[i][0] = (i & 1) ? amesh.aabb.aabbmax[0] : amesh.aabb.aabbmin[0];
+        amesh.aabb.corners[i][1] = (i & 2) ? amesh.aabb.aabbmax[1] : amesh.aabb.aabbmin[1];
+        amesh.aabb.corners[i][2] = (i & 4) ? amesh.aabb.aabbmax[2] : amesh.aabb.aabbmin[2];
+    }
+
 	return(computeVAO(divisions+1, p+2, p, divisions*2, 0.0f));
 }
 
