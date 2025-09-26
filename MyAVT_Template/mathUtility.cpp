@@ -9,7 +9,7 @@
  // The code comes with no warranties, use it at your own risk.
  // You may use it, or parts of it, wherever you want.
  //
- // Author: João Madeiras Pereira
+ // Author: Joï¿½o Madeiras Pereira
  //
  *
  ---------------------------------------------------------------*/
@@ -24,12 +24,9 @@
 #define M_PI       3.14159265358979323846f
 #endif
 
-static inline float 
-DegToRad(float degrees) 
-{ 
-	return (float)(degrees * (M_PI / 180.0f));
-};
-
+float gmu::DegToRad(float degrees) {
+        return degrees * (M_PI / 180.0f);
+}
 
 // glPushMatrix implementation
 void gmu::pushMatrix(MatrixTypes aType) {

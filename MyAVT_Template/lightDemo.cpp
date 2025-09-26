@@ -54,14 +54,17 @@ Renderer renderer;
 	
 // Camera Position
 // Follow-camera mouse offsets (degrees)
-float followYawOffsetDeg = 0.f;
-float followPitchOffsetDeg = 15.f;   // slight downward tilt by default
+
+float followYawOffsetDeg = 0.0f;    // controlled by mouse X
+float followPitchOffsetDeg = 20.0f; // controlled by mouse Y
+float followDistance = 30.0f;       // distance from drone
+float followHeight = 10.0f;         // vertical offset
+
 float minPitchDeg = -10.0f, maxPitchDeg = 85.0f;
 // mouse sensitivity & state
 float MOUSE_SENS_YAW = 0.25f;    // deg per pixel
 float MOUSE_SENS_PITCH = 0.25f;  // deg per pixel
 float startYawDeg = 0.f, startPitchDeg = 0.f;
-float startFollowDistance = 20.f;
 // Zoom sensitivity (world units per pixel of RMB drag)
 float ZOOM_SENS = 0.05f;
 
@@ -90,13 +93,26 @@ const float maxVertSpeed    = 0.5f;      // clamp Y speed
 // Special (arrow) key states
 bool spKeys[256] = {false};       // GLUT special keys (UP/DOWN/LEFT/RIGHT)
 
-bool keyStates[256] = {false};
+bool keyPressed[256] = {false};
 
 struct Drone {
-    float position[3] = {20.0f, 20.0f, -20.0f}; // xyz
-    float direction[3] = {0.0f, 0.0f, -1.0f}; // pointing along -Z initially
-	float speed;
-};
+    float position[3]  = {20.0f, 20.0f, -20.0f}; // xyz world position
+    float direction[3] = {0.0f, 0.0f, -1.0f};    // forward direction for camera
+    float velocity[3]  = {0.0f, 0.0f, 0.0f};     // (velX, velY, velZ)
+
+    // --- Orientation ---
+    float pitch = 0.0f;  // tilt forward/back (affects X/Z accel)
+    float roll  = 0.0f;  // tilt left/right (affects X/Z accel)
+    float yaw   = 0.0f;  // rotation around Y (for camera + orientation)
+
+    // --- Rotation speed ---
+    float velRot = 0.0f; // yaw rotational velocity
+} drone;
+
+float angleStep = 5.0f;  // degrees per key press
+float yawStep   = 5.0f;  // degrees per A/D press
+float maxSpeed  = 0.5f;  // units per frame
+float maxRot    = 3.0f;  // max yaw rotation speed
 
 struct FlyingObject {
     float position[3];
@@ -111,12 +127,6 @@ struct FlyingObject {
 std::vector<PointLight> pointLights;
 
 std::vector<FlyingObject> flyingObjects;
-
-Drone drone;
-float droneSpeed = 0.2f;       // units per frame
-float followDistance = 15.0f;  // camera distance behind drone
-float followHeight = 5.0f;     // camera height above drone
-float droneRotSpeed = 1.5f;    // degrees per frame
 
 struct Camera {
   float camPos[4] = {0.0f, 0.0f, 0.0f, 0.0f}; //camera 4 for orbit view of drone
@@ -227,10 +237,6 @@ void refresh(int value) // faz RENDER
 	glutTimerFunc(1000 / 60, refresh, 0);
 }
 
-void animate(){ //UPDATE das posicoes e no render desenha!
-	/* vel = theta * ...;
-	pos += vel * deltaT */
-}
 
 // ------------------------------------------------------------
 //
@@ -265,33 +271,78 @@ void changeSize(int w, int h) {
 //
 // Render stufff
 //
-void updateFlight() {
-    const float D2R = 3.1415926f / 180.0f;
-	if (keyStates['w']){
-		drone.position[0] += drone.direction[0] * droneSpeed;
-		drone.position[2] += drone.direction[2] * droneSpeed;
-	}
-	if (keyStates['s']){
-		drone.position[0] -= drone.direction[0] * droneSpeed;
-		drone.position[2] -= drone.direction[2] * droneSpeed;
-	}
-    // --- Yaw (A/D): adjust heading, then rebuild forward vector
-    if (keyStates['a']) yawDeg -= droneRotSpeed;   // deg/frame (uses your existing var)
-    if (keyStates['d']) yawDeg += droneRotSpeed;
-
-	
-    float yawRad = yawDeg * D2R;
-    drone.direction[0] = std::sin(yawRad);
-    drone.direction[1] = 0.0f;
-    drone.direction[2] = -std::cos(yawRad);
-
-    // --- Integrate position
-    drone.position[0] += velX;
-    drone.position[1] += velY;
-    drone.position[2] += velZ;
+void moveDrone() {
+    // Apply velocity to position
+    drone.position[0] += drone.velocity[0]; // X
+    drone.position[1] += drone.velocity[1]; // Y (throttle)
+    drone.position[2] += drone.velocity[2]; // Z
 }
 
-void updateCamera(){
+void updateDrone() {
+    // --- Vertical throttle (W/S for up/down) ---
+    if (keyPressed['w'] && drone.velocity[1] < maxSpeed) drone.velocity[1] += 0.01f;
+    if (keyPressed['s'] && drone.velocity[1] > -maxSpeed) drone.velocity[1] -= 0.01f;
+
+    // Vertical drag (slows down gradually)
+    if (!keyPressed['w'] && !keyPressed['s']) {
+        drone.velocity[1] *= 0.98f;
+        if (fabs(drone.velocity[1]) < 0.001f) drone.velocity[1] = 0.0f;
+    }
+
+    // --- Yaw control (A/D) ---
+    if (keyPressed['a']) drone.yaw += 1.0f;
+    if (keyPressed['d']) drone.yaw -= 1.0f;
+
+	// --- Pitch & Roll control (arrows) ---
+	drone.pitch = 0.0f;
+	drone.roll  = 0.0f;
+
+	if (spKeys[GLUT_KEY_UP])    drone.pitch += angleStep;
+	if (spKeys[GLUT_KEY_DOWN])  drone.pitch -= angleStep;
+	if (spKeys[GLUT_KEY_LEFT])  drone.roll  += angleStep;
+	if (spKeys[GLUT_KEY_RIGHT]) drone.roll  -= angleStep;
+
+
+    // --- Compute horizontal acceleration from pitch & roll ---
+    float cosYaw = cos(mu.DegToRad(drone.yaw));
+    float sinYaw = sin(mu.DegToRad(drone.yaw));
+
+    // Forward/back = pitch, left/right = roll
+    float accX = sinYaw * drone.pitch + cosYaw * drone.roll;
+    float accZ = cosYaw * drone.pitch - sinYaw * drone.roll;
+
+    // Apply acceleration to horizontal velocity
+    drone.velocity[0] += accX * 0.01f; // X
+    drone.velocity[2] += accZ * 0.01f; // Z
+
+    // Horizontal drag
+    drone.velocity[0] *= 0.98f;
+    drone.velocity[2] *= 0.98f;
+
+    // --- Move drone ---
+    moveDrone();
+
+    // --- Clamp altitude ---
+    if (drone.position[1] < 0.0f) {
+        drone.position[1] = 0.0f;
+        drone.velocity[1] = 0.0f;
+    }
+
+    // --- Update direction for camera ---
+    float cosPitch = cos(mu.DegToRad(drone.pitch));
+    float sinPitch = sin(mu.DegToRad(drone.pitch));
+
+    drone.direction[0] = cosYaw * cosPitch;
+    drone.direction[1] = sinPitch;
+    drone.direction[2] = -sinYaw * cosPitch;
+
+	std::cout << "Yaw: " << drone.yaw << ", Pitch: " << drone.pitch << ", Roll: " << drone.roll << std::endl;
+	std::cout << "Velocity: " << drone.velocity[0] << ", " << drone.velocity[2] << std::endl;
+
+}
+
+
+void updateCameras(){
 	float ratio = (float)WinX / (float)WinY;
 
 	mu.loadIdentity(gmu::PROJECTION);
@@ -304,12 +355,48 @@ void updateCamera(){
 	}
 }
 
+void updateCamera2() {
+    if (activeCam != 2) return;
+
+    // Drone pivot point (target)
+    float pivotX = drone.position[0];
+    float pivotY = drone.position[1] + followHeight;
+    float pivotZ = drone.position[2];
+
+    // Compute camera position in spherical coordinates
+    float yawRad   = mu.DegToRad(drone.yaw + followYawOffsetDeg);
+    float pitchRad = mu.DegToRad(followPitchOffsetDeg);
+
+    float cosPitch = cos(pitchRad);
+    cams[2].camPos[0] = pivotX - followDistance * sin(yawRad) * cosPitch;
+    cams[2].camPos[1] = pivotY + followDistance * sin(pitchRad);
+    cams[2].camPos[2] = pivotZ - followDistance * cos(yawRad) * cosPitch;
+
+    // Camera target always on the drone
+    cams[2].camTarget[0] = pivotX;
+    cams[2].camTarget[1] = pivotY;
+    cams[2].camTarget[2] = pivotZ;
+}
+
+
+void update(){ //UPDATE das posicoes e no render desenha!
+	 // Update drone movement
+    updateDrone();
+	updateCamera2();
+    updateCameras();
+
+	/* vel = theta * ...;
+	pos += vel * deltaT */
+}
+
 void renderSim(void) {
 
     FrameCount++;
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
+
+	update(); 
 
     renderer.setTexUnit(0, 0);
     renderer.setTexUnit(1, 1);
@@ -318,10 +405,6 @@ void renderSim(void) {
     renderer.setTexUnit(4, 4);
 	renderer.setTexUnit(5, 5);
 	renderer.setTexUnit(6, 6);
-
-    // Update drone movement
-    updateFlight();
-    updateCamera();
 
     // --- Set camera/view ---
     mu.loadIdentity(gmu::VIEW);
@@ -354,50 +437,7 @@ void renderSim(void) {
 		}
 	}
 
-	// --- Follow camera (activeCam == 2): orbit around drone forward with mouse offsets
-	if (activeCam == 2) {
-        const float k = 0.20f; // 0..1, higher = snappier
-		sYawDeg   += (followYawOffsetDeg   - sYawDeg)   * k;
-		sPitchDeg += (followPitchOffsetDeg - sPitchDeg) * k;
-		sDist     += (followDistance       - sDist)     * k;
-
-		// --- Build follow camera from smoothed values ---
-		const float DEG2RAD = 3.1415926f / 180.0f;
-
-		// Pivot at fixed height over the drone (prevents “zoomy” feeling)
-		float pivotX = drone.position[0];
-		float pivotY = drone.position[1] + followHeight;
-		float pivotZ = drone.position[2];
-
-		// Camera position: orbit on XZ using YAW only (fixed radius sDist)
-		float baseYaw = atan2f(drone.direction[0], -drone.direction[2]); // radians
-		float yawCam  = baseYaw + (sYawDeg + 180.0f) * DEG2RAD;  // put cam behind at yaw=0
-		float ox = sinf(yawCam), oz = cosf(yawCam);
-
-		cams[2].camPos[0] = drone.position[0] + followHeight;
-		cams[2].camPos[1] = drone.position[1] + followHeight;
-		cams[2].camPos[2] = drone.position[2] + followHeight;
-
-		// Camera target: use PITCH to tilt the VIEW (not the position)
-		float pitchCam = sPitchDeg * DEG2RAD;
-
-		// forward (XZ) normalized
-		float fx = drone.direction[0], fz = drone.direction[2];
-		float fl = std::sqrt(fx*fx + fz*fz); if (fl < 1e-6f) { fx = 0.f; fz = -1.f; fl = 1.f; }
-		fx /= fl; fz /= fl;
-
-		float lx = fx * std::cos(pitchCam);
-		float ly = std::sin(pitchCam);
-		float lz = fz * std::cos(pitchCam);
-
-		float lookAhead = 40.0f;
-		cams[2].camTarget[0] = drone.position[0];
-		cams[2].camTarget[1] = drone.position[1];
-		cams[2].camTarget[2] = drone.position[2];
-	}
-
 	//camera for orbit view of the drone
-
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
 	cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0,1,0);
@@ -735,114 +775,195 @@ void renderSim(void) {
 
 
 void keyUp(unsigned char key, int x, int y) {
-    keyStates[key] = false;
+    keyPressed[key] = false;
 }
 
-void processKeys(unsigned char key, int xx, int yy)
-{
-	keyStates[key] = true;
+void processKeys(unsigned char key, int xx, int yy) {
+    if (!keyPressed[key]) {
+        keyPressed[key] = true;
 
-	switch(key) {
+        switch (key) {
+            case 27: // ESC
+                glutLeaveMainLoop();
+                break;
 
-		case 27:
-			glutLeaveMainLoop();
-			break;
+            case 'h':   // toggle spotlight mode
+                spotlight_mode = !spotlight_mode;
+                printf("Spotlight %s\n", spotlight_mode ? "ON" : "OFF");
+                break;
 
-		case 'h':   //toggle spotlight mode
-			if (!spotlight_mode) {
-				spotlight_mode = true;
-				printf("Spot light disabled\n");
-			}
-			else {
-				spotlight_mode = false;
-				printf("Spot light disabled. Point light enabled\n");
-			}
-			break;
+            case 'c':   // toggle lamp posts
+                lampsOn = !lampsOn;
+                printf("Lamp posts %s\n", lampsOn ? "ON" : "OFF");
+                break;
 
-		case 'c':   // toggle lamp posts
-			lampsOn = !lampsOn;
-			printf("Lamp posts %s\n", lampsOn ? "ON" : "OFF");
-			break;
+            case 'n':   // toggle day/night mode
+                dayMode = !dayMode;
+                printf("Day/Night: %s\n", dayMode ? "Day" : "Night");
+                break;
 
-		case 'n':   // toggle day/night mode
-			dayMode = !dayMode;
-			if (dayMode)
-				printf("Day mode ON\n");
-			else
-				printf("Night mode ON\n");
-			break;
+            case 'm':
+                glEnable(GL_MULTISAMPLE);
+                break;
 
+            case 'p':
+                glDisable(GL_MULTISAMPLE);
+                break;
 
-		case 'm': glEnable(GL_MULTISAMPLE); break;
-		case 'p': glDisable(GL_MULTISAMPLE); break;
-		case '1':
-			activeCam = 0; 
+            case '1':
+                activeCam = 0;
+                break;
+            case '2':
+                activeCam = 1;
+                break;
+            case '3':
+                activeCam = 2;
+                break;
+            case '4':
+                activeCam = 3;
+                break;
+        }
+    }
+	switch (key) { //dont work as toggle
+		case 'w': // w
+			keyPressed['w'] = true;
 			break;
-		case '2':
-			activeCam = 1;
+		case 's': // s
+			keyPressed['s'] = true;
 			break;
-		case '3':
-			activeCam = 2;
+		case 'a': 
+			keyPressed['a'] = true; 
 			break;
-		case '4': 
-			activeCam = 3;
-			break; 
+    	case 'd': 
+			keyPressed['d'] = true; 
+			std::cout << "GLUT_KEY_RIGHT state: " << spKeys[GLUT_KEY_RIGHT] << std::endl;
+			break;
 	}
 }
+
+// Called when special key pressed
+void processSpecialDown(int key, int x, int y) {
+    spKeys[key] = true;
+
+    // Set pitch/roll based on arrow key
+   /*  switch(key) {
+        case GLUT_KEY_UP:    drone.pitch =  angleStep; break;
+        case GLUT_KEY_DOWN:  drone.pitch = -angleStep; break;
+        case GLUT_KEY_LEFT:  drone.roll  =  angleStep; break;
+        case GLUT_KEY_RIGHT: drone.roll  = -angleStep; break;
+    } */
+}
+
+// Called when special key released
+void processSpecialUp(int key, int x, int y) {
+    spKeys[key] = false;
+
+    // Reset tilt smoothly
+    switch(key) {
+        case GLUT_KEY_UP:
+        case GLUT_KEY_DOWN:
+            drone.pitch = 0.0f; 
+            break;
+        case GLUT_KEY_LEFT:
+        case GLUT_KEY_RIGHT:
+            drone.roll = 0.0f; 
+            break;
+    }
+}
+
 
 
 // ------------------------------------------------------------
 //
 // Mouse Events
 //
-
 void processMouseButtons(int button, int state, int xx, int yy)
 {
-    if (state == GLUT_DOWN)  {
-        startX = prevX = xx;
-        startY = prevY = yy;
+	// start tracking the mouse
+	if (state == GLUT_DOWN)  {
+		startX = xx;
+		startY = yy;
+		if (button == GLUT_LEFT_BUTTON)
+			tracking = 1;
+		else if (button == GLUT_RIGHT_BUTTON)
+			tracking = 2;
+	}
 
-        if (button == GLUT_LEFT_BUTTON) {
-            tracking = 1; // orbit
-            // no need for startYawDeg/startPitchDeg with incremental mode
-        }
-        else if (button == GLUT_RIGHT_BUTTON) {
-            tracking = 2; // zoom
-            startFollowDistance = followDistance;
-        }
-    } else if (state == GLUT_UP) {
-        tracking = 0;
-    }
+	//stop tracking the mouse
+	else if (state == GLUT_UP) {
+		if (tracking == 1) {
+			alpha -= (xx - startX);
+			beta += (yy - startY);
+		}
+		else if (tracking == 2) {
+			r += (yy - startY) * 0.01f;
+			if (r < 0.1f)
+				r = 0.1f;
+		}
+		tracking = 0;
+	}
 }
 
-// Track mouse motion while buttons are pressed
-
+/* // Track mouse motion while buttons are pressed
 void processMouseMotion(int xx, int yy)
 {
-    int dx = xx - prevX;
-    int dy = yy - prevY;
-    prevX = xx; prevY = yy;
 
-    if (activeCam == 2) {
-        if (tracking == 1) {             // ORBIT (LMB)
-            followYawOffsetDeg   -= dx * MOUSE_SENS_YAW;   // flip sign if feels inverted
-            followPitchOffsetDeg += dy * MOUSE_SENS_PITCH;
+	int deltaX, deltaY;
+	float alphaAux, betaAux;
+	float rAux;
 
-            // clamp pitch only
-            if (followPitchOffsetDeg > maxPitchDeg)       followPitchOffsetDeg = maxPitchDeg;
-            else if (followPitchOffsetDeg < minPitchDeg)  followPitchOffsetDeg = minPitchDeg;
+	deltaX =  - xx + startX;
+	deltaY =    yy - startY;
 
-            // TEMP: remove yaw wrap entirely while testing smooth 360
-            // (comment out your two lines below)
-            // if (followYawOffsetDeg > 180.f)  followYawOffsetDeg -= 360.f;
-            // if (followYawOffsetDeg < -180.f) followYawOffsetDeg += 360.f;
-        }
-        else if (tracking == 2) {         // ZOOM (RMB)
-            followDistance = startFollowDistance + (yy - startY) * ZOOM_SENS;
-            if (followDistance < 5.0f)  followDistance = 5.0f;
-            if (followDistance > 60.0f) followDistance = 60.0f;
-        }
-        return;
+	// left mouse button: move camera
+	if (tracking == 1) {
+
+
+		alphaAux = alpha + deltaX;
+		betaAux = beta + deltaY;
+
+		if (betaAux > 85.0f)
+			betaAux = 85.0f;
+		else if (betaAux < -85.0f)
+			betaAux = -85.0f;
+		rAux = r;
+	}
+	// right mouse button: zoom
+	else if (tracking == 2) {
+
+		alphaAux = alpha;
+		betaAux = beta;
+		rAux = r + (deltaY * 0.01f);
+		if (rAux < 0.1f)
+			rAux = 0.1f;
+	}
+
+	/* camX = rAux * sin(alphaAux * 3.14f / 180.0f) * cos(betaAux * 10.14f / 180.0f);
+	camZ = rAux * cos(alphaAux * 3.14f / 180.0f) * cos(betaAux * 10.14f / 180.0f);
+	camY = rAux *   						       sin(betaAux * 10.14f / 180.0f);
+//  uncomment this if not using an idle or refresh func
+//	glutPostRedisplay();
+} */
+
+void processMouseMotion(int xx, int yy) {
+    int deltaX = xx - startX;
+    int deltaY = yy - startY;
+
+    if (tracking == 1) { // left mouse button: rotate camera
+        followYawOffsetDeg   += deltaX * 0.3f;  // scale to taste
+        followPitchOffsetDeg += deltaY * 0.3f;
+
+        if (followPitchOffsetDeg > 85.0f) followPitchOffsetDeg = 85.0f;
+        if (followPitchOffsetDeg < -85.0f) followPitchOffsetDeg = -85.0f;
+
+        startX = xx; // update last mouse pos
+        startY = yy;
+    }
+    else if (tracking == 2) { // right mouse button: zoom
+        followDistance += deltaY * 0.1f;
+        if (followDistance < 1.0f) followDistance = 1.0f;
+        startX = xx;
+        startY = yy;
     }
 }
 
@@ -860,15 +981,6 @@ void mouseWheel(int wheel, int direction, int x, int y) {
 //  uncomment this if not using an idle or refresh func
 //	glutPostRedisplay();
 }
-
-
-void processSpecialDown(int key, int x, int y) {
-    spKeys[key] = true;
-}
-void processSpecialUp(int key, int x, int y) {
-    spKeys[key] = false;
-}
-
 
 //
 // Scene building with basic geometry
@@ -1055,13 +1167,12 @@ int main(int argc, char **argv) {
 //	Mouse and Keyboard Callbacks
 	glutKeyboardFunc(processKeys);
 	glutKeyboardUpFunc(keyUp);
+	glutSpecialFunc(processSpecialDown);
+	glutSpecialUpFunc(processSpecialUp);
 
 	glutMouseFunc(processMouseButtons);
 	glutMotionFunc(processMouseMotion);
 	glutMouseWheelFunc ( mouseWheel ) ;
-
-	glutSpecialFunc(processSpecialDown);
-	glutSpecialUpFunc(processSpecialUp);
 	
 
 //	return from main loop
