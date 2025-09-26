@@ -279,21 +279,22 @@ void moveDrone() {
 }
 
 void updateDrone() {
-    // --- Vertical throttle (W/S for up/down) ---
     if (keyPressed['w'] && drone.velocity[1] < maxSpeed) drone.velocity[1] += 0.01f;
     if (keyPressed['s'] && drone.velocity[1] > -maxSpeed) drone.velocity[1] -= 0.01f;
 
-    // Vertical drag (slows down gradually)
+    if (keyPressed['a']) drone.yaw += 1.0f;
+    if (keyPressed['d']) drone.yaw -= 1.0f;
+
+	 // Vertical drag
     if (!keyPressed['w'] && !keyPressed['s']) {
         drone.velocity[1] *= 0.98f;
         if (fabs(drone.velocity[1]) < 0.001f) drone.velocity[1] = 0.0f;
     }
 
-    // --- Yaw control (A/D) ---
-    if (keyPressed['a']) drone.yaw += 1.0f;
-    if (keyPressed['d']) drone.yaw -= 1.0f;
+	// Horizontal drag
+    drone.velocity[0] *= 0.98f;
+    drone.velocity[2] *= 0.98f;
 
-	// --- Pitch & Roll control (arrows) ---
 	drone.pitch = 0.0f;
 	drone.roll  = 0.0f;
 
@@ -303,7 +304,7 @@ void updateDrone() {
 	if (spKeys[GLUT_KEY_RIGHT]) drone.roll  -= angleStep;
 
 
-    // --- Compute horizontal acceleration from pitch & roll ---
+    // Horizontal acceleration from pitch and roll
     float cosYaw = cos(mu.DegToRad(drone.yaw));
     float sinYaw = sin(mu.DegToRad(drone.yaw));
 
@@ -315,20 +316,15 @@ void updateDrone() {
     drone.velocity[0] += accX * 0.01f; // X
     drone.velocity[2] += accZ * 0.01f; // Z
 
-    // Horizontal drag
-    drone.velocity[0] *= 0.98f;
-    drone.velocity[2] *= 0.98f;
-
-    // --- Move drone ---
     moveDrone();
 
-    // --- Clamp altitude ---
+    // Clamp altitude ?? need
     if (drone.position[1] < 0.0f) {
         drone.position[1] = 0.0f;
         drone.velocity[1] = 0.0f;
     }
 
-    // --- Update direction for camera ---
+    // Update direction for camera
     float cosPitch = cos(mu.DegToRad(drone.pitch));
     float sinPitch = sin(mu.DegToRad(drone.pitch));
 
@@ -358,25 +354,31 @@ void updateCameras(){
 void updateCamera2() {
     if (activeCam != 2) return;
 
-    // Drone pivot point (target)
-    float pivotX = drone.position[0];
-    float pivotY = drone.position[1] + followHeight;
-    float pivotZ = drone.position[2];
-
-    // Compute camera position in spherical coordinates
-    float yawRad   = mu.DegToRad(drone.yaw + followYawOffsetDeg);
+    float yawRad   = mu.DegToRad(drone.yaw);
     float pitchRad = mu.DegToRad(followPitchOffsetDeg);
+    float yawOff   = mu.DegToRad(followYawOffsetDeg);
 
-    float cosPitch = cos(pitchRad);
-    cams[2].camPos[0] = pivotX - followDistance * sin(yawRad) * cosPitch;
-    cams[2].camPos[1] = pivotY + followDistance * sin(pitchRad);
-    cams[2].camPos[2] = pivotZ - followDistance * cos(yawRad) * cosPitch;
+    float cosP = cos(pitchRad), sinP = sin(pitchRad);
+    float cosY = cos(yawRad),   sinY = sin(yawRad);
 
-    // Camera target always on the drone
-    cams[2].camTarget[0] = pivotX;
-    cams[2].camTarget[1] = pivotY;
-    cams[2].camTarget[2] = pivotZ;
+    // Local spherical offset
+    float lx = -followDistance * sin(yawOff) * cosP;
+    float ly =  followDistance * sinP;
+    float lz = -followDistance * cos(yawOff) * cosP;
+
+    // Rotate offset into world frame
+    float wx = lx * cosY - lz * sinY;
+    float wz = lx * sinY + lz * cosY;
+
+    cams[2].camPos[0] = drone.position[0] + wx;
+    cams[2].camPos[1] = drone.position[1] + followHeight + ly;
+    cams[2].camPos[2] = drone.position[2] + wz;
+
+    cams[2].camTarget[0] = drone.position[0];
+    cams[2].camTarget[1] = drone.position[1] + followHeight;
+    cams[2].camTarget[2] = drone.position[2];
 }
+
 
 
 void update(){ //UPDATE das posicoes e no render desenha!
