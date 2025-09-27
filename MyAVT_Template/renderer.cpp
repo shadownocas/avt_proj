@@ -312,6 +312,10 @@ void Renderer::renderMesh(const dataMesh& data) {
     // Render mesh
     glUniform1i(texMode_loc, data.texMode);
 
+    // --- Set alpha threshold for transparent objects ---
+    GLint locAlpha = glGetUniformLocation(program, "alpha_threshold");
+    glUniform1f(locAlpha, 0.05f);  // tweak 0.05–0.2
+
     glBindVertexArray(mesh.vao);
     glDrawElements(mesh.type, mesh.numIndexes, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);

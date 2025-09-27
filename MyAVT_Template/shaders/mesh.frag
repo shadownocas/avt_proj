@@ -38,6 +38,7 @@ in Data {
 } DataIn;
 
 uniform Materials mat;
+uniform float alpha_threshold;  // for transparency cutoff
 
 // Texture samplers
 uniform sampler2D texmap;   
@@ -138,9 +139,13 @@ void main() {
     }
     else if (texMode == 2) {
         texel = texture(texmap, DataIn.tex_coord);
+        float finalAlpha = texel.a * mat.diffuse.a;
+        if (finalAlpha <= alpha_threshold)
+            discard;
         vec3 finalColor = max(intensity * texel.rgb + spec.rgb, 0.07 * texel.rgb);
-        colorOut = vec4(finalColor, 1.0);
+        colorOut = vec4(finalColor, finalAlpha);
     }
+
     else if (texMode == 3) {
         texel = texture(texmap3, DataIn.tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);

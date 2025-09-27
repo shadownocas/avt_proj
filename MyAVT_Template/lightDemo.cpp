@@ -551,6 +551,9 @@ void renderSim(void)
 
 	FrameCount++;
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
 
@@ -580,66 +583,6 @@ void renderSim(void)
 	renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
 
 	dataMesh data;
-
-	pointLights.clear();
-
-	int lampCount = LAMP_POST_NUMBER;
-	 for (LampPost &lamp : lampPosts) {
-        float lx = lamp.position[0];
-        float ly = lamp.height;
-        float lz = lamp.position[2];
-
-        float worldPos[4] = {lx, ly, lz, 1.0f};
-        float eyePos[4];
-        mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
-
-        PointLight pl;
-        pl.LocalPos[0] = eyePos[0];
-        pl.LocalPos[1] = eyePos[1];
-        pl.LocalPos[2] = eyePos[2];
-        pl.Color[0] = 3.0f;
-        pl.Color[1] = 2.7f;
-        pl.Color[2] = 2.1f;
-        pl.atten.constant = 1.0f;
-        pl.atten.linear   = 0.02f;
-        pl.atten.exp      = 0.02f;
-        pointLights.push_back(pl);
-
-        // --------- Draw lamp post ----------
-        mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, lx, 0, lz);
-        mu.scale(gmu::MODEL, 0.25f, lamp.height, 0.25f);
-        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-        mu.computeNormalMatrix3x3();
-
-        float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(lamp.aabb, modelMatrix); //WORLD SPACEE
-		lamp.worldAABB = aabbBox;
-
-        data.mesh = &allMeshes.cube;
-        data.texMode = 4; // metal
-        data.vm = mu.get(gmu::VIEW_MODEL);
-        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-        data.normal = mu.getNormalMatrix();
-        renderer.renderMesh(data);
-        mu.popMatrix(gmu::MODEL);
-
-        // --------- Draw bulb ----------
-        mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, lx, ly, lz);
-        mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
-        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-        mu.computeNormalMatrix3x3();
-
-        data.mesh = &allMeshes.sphere;
-        data.texMode = 2;
-        data.vm = mu.get(gmu::VIEW_MODEL);
-        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-        data.normal = mu.getNormalMatrix();
-        renderer.renderMesh(data);
-        mu.popMatrix(gmu::MODEL);
-    }
-	renderer.setLampLights(pointLights, lampsOn);
 
 	// --- Headlight offsets in LOCAL space of the cube ---
 	float localHeadlightOffsets[2][4] = {
@@ -758,29 +701,7 @@ void renderSim(void)
 	renderer.renderMesh(data);
 	mu.popMatrix(gmu::MODEL);
 
-	// --- Draw streets (as long quads with asphalt texture) ---
-	/* mu.pushMatrix(gmu::MODEL);
-	{   // vertical street (central column)
-		float streetLenZ = rows * (buildingD + gap);
-		mu.translate(gmu::MODEL, 0.0f, 0.01f, 0.0f); // slightly above floor
-		mu.rotate(gmu::MODEL, 90.0f, 0.0f, 1.0f, 0.0f);
-		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
-		mu.scale(gmu::MODEL, streetWidth, 1.0f, streetLenZ);
-		//mu.rotate(gmu::MODEL, -90.0f, 0.0f, 0.0f, 1.0f);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
-		data.mesh = &allMeshes.quad;        // quad mesh
-		data.texMode = 6;      // texture unit 0 -> asphalt / stone.tga
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
-		mu.loadIdentity(gmu::MODEL);
-	}
-	mu.popMatrix(gmu::MODEL); */
-
 	// 2) MOTORS (4 short white cylinders) — attached to the same parent frame
-
 	const float motorR = 0.22f; // radius
 	const float motorH = 0.15f; // height
 
@@ -882,12 +803,7 @@ void renderSim(void)
 		 // Compute world-space AABB
 		float* modelMatrix = mu.get(gmu::MODEL);
 		AABB aabbBox = updateGlobalAABB(b.aabb, modelMatrix); //WORLD SPACEE
-		//printf("Obj collision aabbmin: %f, %f, %f\n", objCollision.aabbmin[0], objCollision.aabbmin[1], objCollision.aabbmin[2]);
 		b.worldAABB = aabbBox;
-
-		/* printf("AABB min DO building:  [%f, %f, %f]\n", b.worldAABB.aabbmin[0], b.worldAABB.aabbmin[1], b.worldAABB.aabbmin[2]);
-    	printf("AABB max building:  [%f, %f, %f]\n", b.worldAABB.aabbmax[0], b.worldAABB.aabbmax[1], b.worldAABB.aabbmax[2]);
- */
 
 		data.mesh = &allMeshes.cube;
 		data.texMode = 3;
@@ -899,19 +815,69 @@ void renderSim(void)
 		mu.popMatrix(gmu::MODEL);
 	}
 
-	/**
-	   // Camera position: fixed behind and above drone
-		cams[2].camPos[0] = drone.position[0] - drone.direction[0] * followDistance;
-		cams[2].camPos[1] = drone.position[1] + followHeight;
-		cams[2].camPos[2] = drone.position[2] - drone.direction[2] * followDistance;
+	pointLights.clear();
 
-		// Camera target: in front of the drone (not at the drone itself)
-		float lookAhead = 50.0f; // how far forward camera looks
-		cams[2].camTarget[0] = drone.position[0] + drone.direction[0] * lookAhead;
-		cams[2].camTarget[1] = drone.position[1];
-		cams[2].camTarget[2] = drone.position[2] + drone.direction[2] * lookAhead;
+	for (LampPost &lamp : lampPosts) {
+        float lx = lamp.position[0];
+        float ly = lamp.height;
+        float lz = lamp.position[2];
 
-	**/
+        float worldPos[4] = {lx, ly, lz, 1.0f};
+        float eyePos[4];
+        mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+
+        PointLight pl;
+        pl.LocalPos[0] = eyePos[0];
+        pl.LocalPos[1] = eyePos[1];
+        pl.LocalPos[2] = eyePos[2];
+        pl.Color[0] = 3.0f;
+        pl.Color[1] = 2.7f;
+        pl.Color[2] = 2.1f;
+        pl.atten.constant = 1.0f;
+        pl.atten.linear   = 0.02f;
+        pl.atten.exp      = 0.02f;
+        pointLights.push_back(pl);
+
+        // --------- Draw lamp post ----------
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, lx, 0, lz);
+        mu.scale(gmu::MODEL, 0.25f, lamp.height, 0.25f);
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
+
+        float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(lamp.aabb, modelMatrix); //WORLD SPACEE
+		lamp.worldAABB = aabbBox;
+
+        data.mesh = &allMeshes.cube;
+        data.texMode = 4; // metal
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
+        mu.popMatrix(gmu::MODEL);
+    }
+	renderer.setLampLights(pointLights, lampsOn);
+
+	// --------- Draw bulb ----------
+	glDepthMask(GL_FALSE);  // don’t write depth while blending
+	for (LampPost &lamp : lampPosts) {
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, lamp.position[0], lamp.height, lamp.position[2]);
+        mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
+
+        data.mesh = &allMeshes.sphere;
+        data.texMode = 2; //create new one FIX
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
+        mu.popMatrix(gmu::MODEL);
+	}
+	glDepthMask(GL_TRUE);
+
 	glutSwapBuffers();
 }
 
@@ -998,7 +964,6 @@ void processMouseButtons(int button, int state, int xx, int yy)
 		if (button == GLUT_LEFT_BUTTON)
 		{
 			tracking = 1; // orbit
-						  // no need for startYawDeg/startPitchDeg with incremental mode
 		}
 		else if (button == GLUT_RIGHT_BUTTON)
 		{
@@ -1088,10 +1053,11 @@ void buildScene()
 	float diff1[] = {0.8f, 0.1f, 0.1f, 1.0f};
 	float spec1[] = {0.3f, 0.3f, 0.3f, 1.0f};
 
-	float ambBulb[] = {0.2f, 0.2f, 0.0f, 1.0f};	 // slight yellow base
-	float diffBulb[] = {0.8f, 0.8f, 0.2f, 1.0f}; // bright yellow diffuse
-	float specBulb[] = {0.5f, 0.5f, 0.3f, 1.0f}; // soft highlight
-	float emisBulb[] = {1.0f, 1.0f, 0.2f, 1.0f}; // strong emissive glow (neon!)
+	float ambBulb[] = {0.2f, 0.2f, 0.0f, 0.3f};	 // alpha = 0.3
+	float diffBulb[] = {0.8f, 0.8f, 0.2f, 0.3f};
+	float specBulb[] = {0.5f, 0.5f, 0.3f, 0.3f};
+	float emisBulb[] = {1.0f, 1.0f, 0.2f, 0.3f};
+
 
 	float emissive[] = {0.0f, 0.0f, 0.0f, 1.0f};
 	float shininess = 100.0f;
@@ -1117,10 +1083,10 @@ void buildScene()
 
 	// Sphere
 	allMeshes.sphere = createSphere(1.0f, 16);
-	memcpy(allMeshes.sphere.mat.ambient, amb1, 4 * sizeof(float));
-	memcpy(allMeshes.sphere.mat.diffuse, diff1, 4 * sizeof(float));
-	memcpy(allMeshes.sphere.mat.specular, spec1, 4 * sizeof(float));
-	memcpy(allMeshes.sphere.mat.emissive, emissive, 4 * sizeof(float));
+	memcpy(allMeshes.sphere.mat.ambient, ambBulb, 4 * sizeof(float));
+	memcpy(allMeshes.sphere.mat.diffuse, diffBulb, 4 * sizeof(float));
+	memcpy(allMeshes.sphere.mat.specular, specBulb, 4 * sizeof(float));
+	memcpy(allMeshes.sphere.mat.emissive, emisBulb, 4 * sizeof(float));
 	allMeshes.sphere.mat.shininess = shininess;
 	allMeshes.sphere.mat.texCount = texcount;
 
