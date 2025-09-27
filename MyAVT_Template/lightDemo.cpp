@@ -37,6 +37,7 @@
 using namespace std;
 
 #define CAPTION "AVT 2025 Welcome Demo"
+#define LAMP_POST_NUMBER 6
 int WindowHandle = 0;
 int WinX = 1024, WinY = 768;
 
@@ -119,9 +120,29 @@ struct FlyingObject
 	AABB worldAABB;
 };
 
+struct LampPost
+{
+	float position[3];
+	float height;
+	AABB aabb;
+	AABB worldAABB;
+};
+
+struct Tree {
+    float position[3];
+    float scale[3];
+    AABB aabb;     
+    AABB worldAABB;
+};
+
 std::vector<PointLight> pointLights;
 
 std::vector<FlyingObject> flyingObjects;
+
+std::vector<LampPost> lampPosts;
+
+std::vector<Tree> trees;
+
 
 Drone drone;
 float droneSpeed = 0.2f;	  // units per frame
@@ -213,13 +234,6 @@ float gardenCenterZ = 5.0f;
 float gardenW = gardenHalfW * 2.0f;
 float gardenD = gardenHalfD * 2.0f;
 
-bool checkOverlap(const Building &a, const Building &b, float buffer = 1.0f)
-{
-	return !(a.x + a.width / 2 + buffer < b.x - b.width / 2 ||
-			 a.x - a.width / 2 - buffer > b.x + b.width / 2 ||
-			 a.z + a.depth / 2 + buffer < b.z - b.depth / 2 ||
-			 a.z - a.depth / 2 - buffer > b.z + b.depth / 2);
-}
 
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
 
@@ -281,10 +295,7 @@ void changeSize(int w, int h)
 AABB updateGlobalAABB(AABB result, float* modelMatrix) {
     float globalMin[3] = { 100000000000, 100000000000, 100000000000 };
     float globalMax[3] = { -100000000000, -100000000000, -100000000000 };
-	AABB obj = result;  
-	//printf("obj updateGlobalAABB aabb min x: %f y: %f z: %f\n", obj.aabbmin[0], obj.aabbmin[1], obj.aabbmin[2]);
-	//printf("updateGlobalAABB print aabb max x: %f y: %f z: %f\n", obj.aabbmax[0], obj.aabbmax[1], obj.aabbmax[2]);
-	//ObjCollision objCollision; // Copy original collision data
+	AABB obj = result; 
     for (int i = 0; i < 8; i++) {
         float* c = obj.corners[i];
 
@@ -462,60 +473,7 @@ bool checkAABBCollision(const float minA[3], const float maxA[3], const float mi
     return true; //collsionnn
 }
 
-void update(){ //UPDATE das posicoes e no render desenha!
-	 // Update drone movement
-	 // delta time (seconds)
-	static int prevMs = -1;
-	int nowMs = glutGet(GLUT_ELAPSED_TIME);
-	if (prevMs < 0)
-		prevMs = nowMs;
-	float dt = (nowMs - prevMs) / 1000.0f;
-	prevMs = nowMs;
-	if (dt < 0.001f)
-		dt = 0.001f;
-	if (dt > 0.033f)
-		dt = 0.033f;
-	
-	for (Building &b : buildings) {
-		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
-			printf("COLLISION with BUILDING object!");
-		}
-	}
-
-	for (FlyingObject &obj : flyingObjects) {
-		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
-			printf("COLLISION with FLYING object!");
-		}
-	}
-
-    updateDrone(dt);
-	updateCamera2();
-    updateCameras();
-}
-
-void renderSim(void)
-{
-
-	FrameCount++;
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
-
-	update();
-
-	renderer.setTexUnit(0, 0);
-	renderer.setTexUnit(1, 1);
-	renderer.setTexUnit(2, 2);
-	renderer.setTexUnit(3, 3);
-	renderer.setTexUnit(4, 4);
-	renderer.setTexUnit(5, 5);
-	renderer.setTexUnit(6, 6);
-
-	// --- Set camera/view ---
-	mu.loadIdentity(gmu::VIEW);
-	mu.loadIdentity(gmu::MODEL);
-
-	// ----- UPDATE FLYING OBJECTS -----
+void updateFlyingObjects(){
 	for (auto &obj : flyingObjects)
 	{
 		// Move forward
@@ -542,8 +500,73 @@ void renderSim(void)
 			obj.rotationAngle = 0.0f;
 		}
 	}
+}
 
-	// camera for orbit view of the drone
+void update(){ //UPDATE das posicoes e no render desenha!
+	 // Update drone movement
+	 // delta time (seconds)
+	static int prevMs = -1;
+	int nowMs = glutGet(GLUT_ELAPSED_TIME);
+	if (prevMs < 0)
+		prevMs = nowMs;
+	float dt = (nowMs - prevMs) / 1000.0f;
+	prevMs = nowMs;
+	if (dt < 0.001f)
+		dt = 0.001f;
+	if (dt > 0.033f)
+		dt = 0.033f;
+	
+	for (Building &b : buildings) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
+			printf("COLLISION with BUILDING object!");
+		}
+	}
+
+	for (FlyingObject &obj : flyingObjects) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+			printf("COLLISION with FLYING object!");
+		}
+	}
+
+	for (LampPost &obj : lampPosts) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+			printf("COLLISION with LAMPPOST object!");
+		}
+	}
+
+	for (Tree &obj : trees) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+			printf("COLLISION with TREE object!");
+		}
+	}
+
+    updateDrone(dt);
+	updateFlyingObjects();
+	updateCamera2();
+    updateCameras();
+}
+
+void renderSim(void)
+{
+
+	FrameCount++;
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
+
+	update();
+
+	renderer.setTexUnit(0, 0);
+	renderer.setTexUnit(1, 1);
+	renderer.setTexUnit(2, 2);
+	renderer.setTexUnit(3, 3);
+	renderer.setTexUnit(4, 4);
+	renderer.setTexUnit(5, 5);
+	renderer.setTexUnit(6, 6);
+
+	// --- Set camera/view ---
+	mu.loadIdentity(gmu::VIEW);
+	mu.loadIdentity(gmu::MODEL);
 
 	// set the camera using a function similar to gluLookAt
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
@@ -560,62 +583,62 @@ void renderSim(void)
 
 	pointLights.clear();
 
-	int lampCount = 6;
-	float lampRadius = std::max(gardenW, gardenD) / 2.0f; // postes ligeiramente fora do jardim
+	int lampCount = LAMP_POST_NUMBER;
+	 for (LampPost &lamp : lampPosts) {
+        float lx = lamp.position[0];
+        float ly = lamp.height;
+        float lz = lamp.position[2];
 
-	for (int i = 0; i < lampCount; ++i)
-	{
-		float ang = (2.0f * 3.14159f) * i / lampCount;
-		float lx = gardenCenterX + lampRadius * cos(ang);
-		float lz = gardenCenterZ + lampRadius * sin(ang);
-		float ly = lampHeight;
+        float worldPos[4] = {lx, ly, lz, 1.0f};
+        float eyePos[4];
+        mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
 
-		float worldPos[4] = {lx, ly, lz, 1.0f};
-		float eyePos[4];
-		mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+        PointLight pl;
+        pl.LocalPos[0] = eyePos[0];
+        pl.LocalPos[1] = eyePos[1];
+        pl.LocalPos[2] = eyePos[2];
+        pl.Color[0] = 3.0f;
+        pl.Color[1] = 2.7f;
+        pl.Color[2] = 2.1f;
+        pl.atten.constant = 1.0f;
+        pl.atten.linear   = 0.02f;
+        pl.atten.exp      = 0.02f;
+        pointLights.push_back(pl);
 
-		PointLight lamp;
-		lamp.LocalPos[0] = eyePos[0];
-		lamp.LocalPos[1] = eyePos[1];
-		lamp.LocalPos[2] = eyePos[2];
-		lamp.Color[0] = 3.0f;
-		lamp.Color[1] = 2.7f;
-		lamp.Color[2] = 2.1f;
-		lamp.atten.constant = 1.0f;
-		lamp.atten.linear = 0.02f;
-		lamp.atten.exp = 0.02f;
-		pointLights.push_back(lamp);
+        // --------- Draw lamp post ----------
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, lx, 0, lz);
+        mu.scale(gmu::MODEL, 0.25f, lamp.height, 0.25f);
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
 
-		// LampPost
-		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, lx, 0, lz);
-		mu.scale(gmu::MODEL, 0.25f, ly, 0.25f);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
-		data.mesh = &allMeshes.cube; // cube
-		data.texMode = 4;			 // metal
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
-		mu.popMatrix(gmu::MODEL);
+        float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(lamp.aabb, modelMatrix); //WORLD SPACEE
+		lamp.worldAABB = aabbBox;
 
-		// and small emissive sphere at top as bulb
-		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, lx, ly, lz);
-		mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
-		data.mesh = &allMeshes.sphere; // sphere mesh
-		data.texMode = 2;
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
+        data.mesh = &allMeshes.cube;
+        data.texMode = 4; // metal
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
+        mu.popMatrix(gmu::MODEL);
 
-		// set emissive on mesh material somehow (if renderer supports per-mesh emissive)
-		renderer.renderMesh(data);
-		mu.popMatrix(gmu::MODEL);
-	}
+        // --------- Draw bulb ----------
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, lx, ly, lz);
+        mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
+
+        data.mesh = &allMeshes.sphere;
+        data.texMode = 2;
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
+        mu.popMatrix(gmu::MODEL);
+    }
 	renderer.setLampLights(pointLights, lampsOn);
 
 	// --- Headlight offsets in LOCAL space of the cube ---
@@ -673,10 +696,15 @@ void renderSim(void)
 	{
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, obj.position[0], obj.position[1], obj.position[2]);
+		mu.scale(gmu::MODEL, 5.0f, 5.0f, 5.0f);
 		mu.rotate(gmu::MODEL, obj.rotationAngle, 0.0f, 1.0f, 0.0f);
 
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
+
+		float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(obj.aabb, modelMatrix); //WORLD SPACEE
+		obj.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
 		data.texMode = 1;
@@ -706,11 +734,7 @@ void renderSim(void)
 	// --- Draw drone (green cube body + 4 white motors) ---
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
-
-	// Body size (keep these up here so we can use them for the pivot)
 	const float bodyX = 1.6f, bodyY = 0.25f, bodyZ = 1.6f;
-
-	// Use yawDeg directly (same as angleY you computed)
 	mu.translate(gmu::MODEL, bodyX * 0.5f, bodyY * 0.5f, bodyZ * 0.5f);	   // to center
 	mu.rotate(gmu::MODEL, yawDeg, 0.0f, 1.0f, 0.0f);					   // yaw (A/D)
 	mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f);					   // slight nose tilt (UP/DOWN)
@@ -723,11 +747,8 @@ void renderSim(void)
 
 	float* modelMatrix = mu.get(gmu::MODEL);
 	AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix); //WORLD SPACEE
-	//printf("Obj collision aabbmin: %f, %f, %f\n", objCollision.aabbmin[0], objCollision.aabbmin[1], objCollision.aabbmin[2]);
 	drone.worldAABB = aabbBox;
-	/* printf("AABB min DO DRONE:  [%f, %f, %f]\n", drone.worldAABB.aabbmin[0], drone.worldAABB.aabbmin[1], drone.worldAABB.aabbmin[2]);
-    printf("AABB max DRONE:  [%f, %f, %f]\n", drone.worldAABB.aabbmax[0], drone.worldAABB.aabbmax[1], drone.worldAABB.aabbmax[2]);
- */
+
 	data.texMode = 1; // material shading
 	data.mesh = &allMeshes.cube;
 	data.texMode = 4;
@@ -810,7 +831,7 @@ void renderSim(void)
 	}
 	mu.popMatrix(gmu::MODEL);
 
-	// --- Draw garden (central park) ---
+	// --- Garden (central park) ---
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
 	mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
@@ -826,25 +847,26 @@ void renderSim(void)
 	mu.popMatrix(gmu::MODEL);
 
 	// place some low 'tree' cones around garden
-	for (int t = 0; t < 6; ++t)
-	{
-		float ang = (2.0f * 3.14159f) * t / 6.0f;
-		float rx = gardenCenterX + (gardenW / 2.2f - 4.0f) * cos(ang);
-		float rz = gardenCenterZ + (gardenD / 2.2f - 4.0f) * sin(ang);
-		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, rx, 0, rz);
-		mu.scale(gmu::MODEL, 1.5f, 4.0f, 1.5f);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
+	for (Tree &tree : trees) {
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, tree.position[0], tree.position[1], tree.position[2]);
+        mu.scale(gmu::MODEL, tree.scale[0], tree.scale[1], tree.scale[2]);
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
 
-		data.mesh = &allMeshes.cone;
-		data.texMode = 5;
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
-		mu.popMatrix(gmu::MODEL);
-	}
+       float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(tree.aabb, modelMatrix); //WORLD SPACEE
+		tree.worldAABB = aabbBox;
+
+        // --- Render mesh ---
+        data.mesh = &allMeshes.cone;
+        data.texMode = 5;
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
+        mu.popMatrix(gmu::MODEL);
+    }
 
 	// --- Draw buildings using buildings vector ---
 	for (Building &b : buildings)
@@ -1133,8 +1155,6 @@ void buildScene()
 		obj.meshID = 2 + (i % 2);				 // 2 = sphere, 3 = cone
 		obj.active = true;
 		obj.aabb = allMeshes.cube.aabb;
-		/* printf("AABB min:  [%f, %f, %f]\n", obj.aabb.aabbmin[0], obj.aabb.aabbmin[1], obj.aabb.aabbmin[2]);
-    	printf("AABB max:  [%f, %f, %f]\n", obj.aabb.aabbmax[0], obj.aabb.aabbmax[1], obj.aabb.aabbmax[2]); */
 		flyingObjects.push_back(obj);
 	}
 
@@ -1186,6 +1206,42 @@ void buildScene()
 		}
 	}
 
+	float lampRadius = std::max(gardenW, gardenD) / 2.0f; 
+	int lampCount = LAMP_POST_NUMBER;
+    for (int i = 0; i < lampCount; ++i) {
+        float ang = (2.0f * 3.14159f) * i / lampCount;
+        float lx = gardenCenterX + lampRadius * cos(ang);
+        float lz = gardenCenterZ + lampRadius * sin(ang);
+        float ly = lampHeight;
+
+        LampPost lamp;
+        lamp.position[0] = lx;
+        lamp.position[1] = 0.0f;   // base at ground
+        lamp.position[2] = lz;
+        lamp.height = ly;
+        lamp.aabb = allMeshes.cube.aabb;
+
+        lampPosts.push_back(lamp);
+    }
+
+	for (int t = 0; t < 6; ++t) {
+        float ang = (2.0f * 3.14159f) * t / 6.0f;
+        float rx = gardenCenterX + (gardenW / 2.2f - 4.0f) * cos(ang);
+        float rz = gardenCenterZ + (gardenD / 2.2f - 4.0f) * sin(ang);
+
+        Tree tree;
+        tree.position[0] = rx;
+        tree.position[1] = 0.0f;  // base at ground
+        tree.position[2] = rz;
+
+        tree.scale[0] = 1.5f;
+        tree.scale[1] = 4.0f;
+        tree.scale[2] = 1.5f;
+        tree.aabb = allMeshes.cone.aabb; // local bounding box
+
+        trees.push_back(tree);
+    }
+
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
 	drone.position[2] = -20.0f;
@@ -1194,8 +1250,6 @@ void buildScene()
 	drone.direction[1] = 0.0f;
 	drone.direction[2] = -1.0f;
 	drone.aabb = allMeshes.cube.aabb; //cube
-	/* printf("AABB min:  [%f, %f, %f]\n", drone.aabb.aabbmin[0], drone.aabb.aabbmin[1], drone.aabb.aabbmin[2]);
-    printf("AABB max:  [%f, %f, %f]\n", drone.aabb.aabbmax[0], drone.aabb.aabbmax[1], drone.aabb.aabbmax[2]); */
 
 	cams[0].camPos[1] = 200.0;
 	cams[0].camPos[0] = 0.0;

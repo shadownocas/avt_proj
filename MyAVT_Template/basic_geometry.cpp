@@ -175,24 +175,26 @@ MyMesh createCone(float height, float baseRadius, int sides) {
 	}
 	p.push_back(0.0f);			p.push_back(height);
 	p.push_back(-baseRadius);	p.push_back(height * 2.0f);
-	//float p[(sides+3)*2] = {
-	//		-baseRadius,	0.0, 
-	//		0.0f,			0.0, 
-	//		baseRadius,		0.0f,
-	//		baseRadius + v[0] * 0.1,		v[1] * 0.1,
-	//		baseRadius + v[0] * 0.2,		v[1] * 0.2,
-	//		baseRadius + v[0] * 0.3,		v[1] * 0.3,
-	//		baseRadius + v[0] * 0.4,		v[1] * 0.4,
-	//		baseRadius + v[0] * 0.5,		v[1] * 0.5,
-	//		baseRadius + v[0] * 0.6,		v[1] * 0.6,
-	//		baseRadius + v[0] * 0.7,		v[1] * 0.7,
-	//		baseRadius + v[0] * 0.8,		v[1] * 0.8,
-	//		baseRadius + v[0] * 0.9,		v[1] * 0.9,
-	//		0.0f,			height,  
-	//		-baseRadius,	height*2.0f,
-	//	};
+	
+	// Build VAO
+    MyMesh amesh = computeVAO((p.size() - 4) / 2, &(p[2]), &(p[0]), sides, 0.0f);
 
-	return(computeVAO((p.size()-4)/2, &(p[2]), &(p[0]), sides, 0.0f));
+	amesh.aabb.aabbmin[0] = -baseRadius;
+    amesh.aabb.aabbmin[1] = 0.0f;
+    amesh.aabb.aabbmin[2] = -baseRadius;
+
+    amesh.aabb.aabbmax[0] = baseRadius;
+    amesh.aabb.aabbmax[1] = height;
+    amesh.aabb.aabbmax[2] = baseRadius;
+
+    // Compute 8 corners
+    for (int i = 0; i < 8; i++) {
+        amesh.aabb.corners[i][0] = (i & 1) ? amesh.aabb.aabbmax[0] : amesh.aabb.aabbmin[0];
+        amesh.aabb.corners[i][1] = (i & 2) ? amesh.aabb.aabbmax[1] : amesh.aabb.aabbmin[1];
+        amesh.aabb.corners[i][2] = (i & 4) ? amesh.aabb.aabbmax[2] : amesh.aabb.aabbmin[2];
+    }
+
+	return(amesh);
 }
 
 
