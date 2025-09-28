@@ -101,8 +101,10 @@ struct Drone
 {
 	float position[3] = {20.0f, 20.0f, -20.0f}; // xyz
 	float direction[3] = {0.0f, 0.0f, -1.0f};	// pointing along -Z initially
+	float rotation[3] = {0.0f, 0.0f, 0.0f};
 	float speed;
 	float yaw;
+	float velRot;
 	AABB aabb;
 	AABB worldAABB;
 };
@@ -152,6 +154,14 @@ std::vector<LampPost> lampPosts;
 
 std::vector<Tree> trees;
 
+enum DroneState {
+    NORMAL,
+    COLLISION_ANIM
+};
+
+DroneState droneState = NORMAL;
+float collisionAnimTimer = 0.0f;       // milliseconds
+float collisionAnimDuration = 0.5f;  // 0.5 seconds animation
 
 Drone drone;
 float droneSpeed = 0.2f;	  // units per frame
@@ -350,82 +360,166 @@ inline float clampf(float v, float lo, float hi)
 									: v;
 }
 
-void updateDrone(float dt)
-{
-	const float D2R = 3.1415926f / 180.0f; //FIX
-
-	// Tunables (per second)
-	const float YAW_SPEED_DEG = 60.0f; // A/D yaw rate
-	const float VERT_ACCEL = 5.0f;	   // W/S vertical accel (units/s^2)
-	const float VERT_DRAG_S = 1.2f;	   // vertical drag (1/s)
-	const float MAX_VSPEED = 20.0f;	   // max vertical speed (units/s)
-
-	// A/D — yaw only (rotate heading)
-	if (keyStates['a'])
-		yawDeg -= YAW_SPEED_DEG * dt;
-	if (keyStates['d'])
-		yawDeg += YAW_SPEED_DEG * dt;
-
-	drone.yaw = yawDeg;
-
-	// update forward dir (useful for cameras/lights)
-	float yawRad = yawDeg * D2R;
-	drone.direction[0] = std::sin(yawRad);
-	drone.direction[1] = 0.0f;
-	drone.direction[2] = -std::cos(yawRad);
-
-	// --- Up/Down arrows: forward/back target speed with smooth ramp ---
-	float targetFwd = 0.0f;
-	if (spKeys[GLUT_KEY_UP])
-		targetFwd = +FWD_MAX_SPEED; // move forward
-	else if (spKeys[GLUT_KEY_DOWN])
-		targetFwd = -FWD_MAX_SPEED; // move backward
-
-	// Ease current forward speed toward target (Option B style)
-	vFwd += (targetFwd - vFwd) * FWD_GAIN * dt;
-
-	// Map forward speed to world velocity using current yaw
-	float sinY = drone.direction[0];
-	float cosY = -drone.direction[2];
-	velX = vFwd * sinY;
-	velZ = vFwd * cosY;
-
-	// Integrate horizontal motion
-	drone.position[0] += velX * dt;
-	drone.position[2] += velZ * dt;
-
-	// --- Visual nose tilt proportional to forward speed ---
-	float pitchTarget = +PITCH_VIS_MAX * (vFwd / FWD_MAX_SPEED);  //tilt direction the same as movement direction
-	pitchDeg += (pitchTarget - pitchDeg) * 6.0f * dt; // smooth the tilt
-
-	// W/S target vertical speed (smooth ramp) ---
-	const float THROTTLE_GAIN = 3.0f; // 1/s — higher = snappier
-	float targetVY = 0.0f;
-	if (keyStates['w'])
-		targetVY = +MAX_VSPEED; // rise toward +cap
-	else if (keyStates['s'])
-		targetVY = -MAX_VSPEED; // fall toward -cap
-
-	// ease current speed toward target
-	velY += (targetVY - velY) * THROTTLE_GAIN * dt;
-
-	// optional tiny bleed so it doesn't hover forever when you release
-	velY *= std::exp(-0.2f * dt);
-
-	// safety clamp (should rarely do anything because target==cap)
-	velY = clampf(velY, -MAX_VSPEED, MAX_VSPEED);
-
-	// integrate position
-	drone.position[1] += velY * dt;
-
-	// keep above ground (optional)
-	if (drone.position[1] < 0.5f)
-	{
-		drone.position[1] = 0.5f;
-		velY = 0.0f;
-	}
+void rotateDrone(float x, float y, float z) {
+	drone.rotation[0] += x;
+	drone.rotation[1] += drone.velRot;
+	drone.rotation[2] += z;
 }
 
+void moveDrone() {
+	drone.position[0] += drone.direction[0] * drone.speed;
+	drone.position[1] += drone.direction[1] * drone.speed;
+	drone.position[2] += drone.direction[2] * drone.speed;
+}
+
+void updateDrone(float dt) {
+	const float MAX_VSPEED = 0.1f;
+	drone.rotation[1] = fmodf(drone.rotation[1], 360.0f);
+	if (drone.rotation[1] < 0.0f) drone.rotation[1] += 360.0f;
+	if (drone.speed == 0) {
+		drone.direction[0] = 0.0f;
+		drone.direction[1] = 0.0f;
+		drone.direction[2] = 0.0f;
+	}
+	if (keyStates['w']) {
+		if (drone.speed < 0.5) drone.speed += MAX_VSPEED;
+		if (drone.direction[1] < 1.0f) drone.direction[1] += MAX_VSPEED;
+	}
+
+	if (keyStates['s']) {
+		if (drone.speed < 0.5) drone.speed += MAX_VSPEED;
+		if (drone.direction[1] > -1.0f) drone.direction[1] -= MAX_VSPEED;
+
+	}
+
+	if (keyStates['a']) {
+		if (drone.velRot < 3.0) drone.velRot += 0.1f;
+		rotateDrone(0.0f, 3.0f, 0.0f);
+	}
+	if (keyStates['d']) {
+		if (drone.velRot > -3.0) drone.velRot -= 0.1f;
+		rotateDrone(0.0f, -3.0f, 0.0f);
+	}
+
+	if (spKeys[GLUT_KEY_DOWN]) {
+		if (drone.speed < 0.5) drone.speed += 0.01f;
+		drone.direction[1] -= 0.005f;
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+		/* drone.direction[0] += cosf(yawRad) * 0.1f;
+		drone.direction[2] += -sinf(yawRad) * 0.1f; */
+		drone.direction[0] += -sinf(yawRad) * 0.1f;
+		drone.direction[2] += -cosf(yawRad) * 0.1f;
+		
+
+		float rotX = drone.rotation[0] + 0.5f * -cosf(yawRad);
+		float rotZ = drone.rotation[2] + 0.5f * sinf(yawRad);
+		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
+		if (tiltMag > 20.0f) {
+			rotX *= 20.0f / tiltMag;
+			rotZ *= 20.0f / tiltMag;
+		}
+		drone.rotation[0] = rotX;
+		drone.rotation[2] = rotZ;
+	}
+
+	if (spKeys[GLUT_KEY_UP]) {
+		if (drone.speed < 0.5) drone.speed += 0.01f;
+		drone.direction[1] -= 0.005f;
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+		drone.direction[0] += sinf(yawRad) * 0.1f;
+		drone.direction[2] += cosf(yawRad) * 0.1f;
+
+		float rotX = drone.rotation[0] + 0.5f * cosf(yawRad);
+		float rotZ = drone.rotation[2] + 0.5f * -sinf(yawRad);
+		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
+		if (tiltMag > 20.0f) {
+			rotX *= 20.0f / tiltMag;
+			rotZ *= 20.0f / tiltMag;
+		}
+		drone.rotation[0] = rotX;
+		drone.rotation[2] = rotZ;
+	}
+
+	if (spKeys[GLUT_KEY_LEFT]) {
+		if (drone.speed < 0.5) drone.speed += 0.01f;
+		drone.direction[1] -= 0.005f;
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+
+		/* drone.direction[0] += sinf(yawRad) * 0.1f;
+		drone.direction[2] += cosf(yawRad) * 0.1f; */
+
+		drone.direction[0] += cosf(yawRad) * 0.1f;
+		drone.direction[2] += -sinf(yawRad) * 0.1f;
+
+		float rotX = drone.rotation[0] + 0.5f * -sinf(yawRad);
+		float rotZ = drone.rotation[2] + 0.5f * -cosf(yawRad);
+		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
+		if (tiltMag > 20.0f) {
+			rotX *= 20.0f / tiltMag;
+			rotZ *= 20.0f / tiltMag;
+		}
+		drone.rotation[0] = rotX;
+		drone.rotation[2] = rotZ;
+	}
+
+	if (spKeys[GLUT_KEY_RIGHT]) {
+		if (drone.speed < 0.5) drone.speed += 0.01f;
+		drone.direction[1] -= 0.005f;
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+
+		drone.direction[0] += -cosf(yawRad) * 0.1f;
+		drone.direction[2] += sinf(yawRad) * 0.1f;
+
+		float rotX = drone.rotation[0] + 0.5f * sinf(yawRad);
+		float rotZ = drone.rotation[2] + 0.5f * cosf(yawRad);
+		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
+		if (tiltMag > 20.0f) {
+			rotX *= 20.0f / tiltMag;
+			rotZ *= 20.0f / tiltMag;
+		}
+		drone.rotation[0] = rotX;
+		drone.rotation[2] = rotZ;
+	}
+
+	float mag = sqrtf(drone.direction[0]*drone.direction[0] + drone.direction[2]*drone.direction[2]);
+	if (mag > 1.0f) {
+		drone.direction[0] /= mag;
+		drone.direction[2] /= mag;
+	}
+
+	if (!spKeys[GLUT_KEY_UP] && !spKeys[GLUT_KEY_DOWN] && 
+	!spKeys[GLUT_KEY_LEFT] && !spKeys[GLUT_KEY_RIGHT]) {
+		float tiltX = drone.rotation[0];
+		float tiltZ = drone.rotation[2];
+		float tiltMag = sqrtf(tiltX*tiltX + tiltZ*tiltZ);
+
+		if (tiltMag > 0.0f) {
+			float recoverySpeed = 0.5f; // degrees per frame
+			float scale = (tiltMag - recoverySpeed) / tiltMag;
+			if (scale < 0.0f) scale = 0.0f;
+
+			drone.rotation[0] *= scale;
+			drone.rotation[2] *= scale;
+		}
+		if (drone.direction[0] != 0.0f || drone.direction[2] != 0.0f) {
+			float dirMag = sqrtf(drone.direction[0]*drone.direction[0] + drone.direction[2]*drone.direction[2]);
+			if (dirMag > 0.0f) {
+				float recoverySpeed = 0.01f; // units per frame
+				float scale = (dirMag - recoverySpeed) / dirMag;
+				if (scale < 0.0f) scale = 0.0f;
+
+				drone.direction[0] *= scale;
+				drone.direction[2] *= scale;
+			}
+		}
+	}
+
+	if (keyStates['a'] == false && keyStates['d'] == false) {
+		drone.velRot = 0.0f;
+	}
+
+	moveDrone();
+}
 void updateCameras(){
 	float ratio = (float)WinX / (float)WinY;
 
@@ -439,7 +533,7 @@ void updateCameras(){
 	}
 }
 
-void updateCamera2() //dt needed??
+void updateCamera2()
 {
     if (activeCam != 2) return;
 
@@ -447,22 +541,24 @@ void updateCamera2() //dt needed??
     float pivotY = drone.position[1] + followHeight;
     float pivotZ = drone.position[2];
 
-    // Convert to radians consistently
-    float yawRad   = mu.DegToRad(drone.yaw + followYawOffsetDeg);
+    // --- Use drone.rotation[1] instead of drone.yaw ---
+    float yawRad   = mu.DegToRad(drone.rotation[1] + followYawOffsetDeg);
     float pitchRad = mu.DegToRad(followPitchOffsetDeg);
 
-    float targetX = pivotX - followDistance * sin(yawRad) * cos(pitchRad);
-    float targetY = pivotY + followDistance * sin(pitchRad);
-    float targetZ = pivotZ - followDistance * cos(yawRad) * cos(pitchRad);
+    // Camera follows behind the drone based on yaw & pitch
+    float offsetX = followDistance * sinf(yawRad) * cosf(pitchRad);
+    float offsetY = followDistance * sinf(pitchRad);
+    float offsetZ = followDistance * cosf(yawRad) * cosf(pitchRad);
 
-    cams[2].camPos[0] = targetX;
-    cams[2].camPos[1] = targetY;
-    cams[2].camPos[2] = targetZ;
+    cams[2].camPos[0] = pivotX - offsetX;
+    cams[2].camPos[1] = pivotY + offsetY;
+    cams[2].camPos[2] = pivotZ - offsetZ;
 
     cams[2].camTarget[0] = pivotX;
     cams[2].camTarget[1] = pivotY;
     cams[2].camTarget[2] = pivotZ;
 }
+
 
 bool checkAABBCollision(const float minA[3], const float maxA[3], const float minB[3], const float maxB[3]) {
     for (int i = 0; i < 3; i++) {
@@ -513,32 +609,71 @@ void update(){
 		dt = 0.001f;
 	if (dt > 0.033f)
 		dt = 0.033f;
+	static bool collisionPushedBack = false;
 
-	for (Building &b : buildings) {
-		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
-			printf("COLLISION with BUILDING object!");
+	if (droneState == NORMAL) {
+		bool collisionDetected = false;
+		for (Building &b : buildings) {
+			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
+				printf("COLLISION with BUILDING object!");
+				collisionDetected = true;
+			}
+		}
+
+		for (FlyingObject &obj : flyingObjects) {
+			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+				printf("COLLISION with FLYING object!");
+				collisionDetected = true;
+			}
+		}
+
+		for (LampPost &obj : lampPosts) {
+			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+				printf("COLLISION with LAMPPOST object!");
+				collisionDetected = true;
+			}
+		}
+
+		for (Tree &obj : trees) {
+			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+				printf("COLLISION with TREE object!");
+				collisionDetected = true;
+			}
+		}
+
+		if (collisionDetected) {
+			droneState = COLLISION_ANIM;
+			collisionPushedBack = false;  // reset for this collision
+			collisionAnimTimer = 0.0f;
+		} else {
+			updateDrone(dt);  // normal movement
 		}
 	}
+	else if (droneState == COLLISION_ANIM) {
+        // Push back once
+        if (!collisionPushedBack) {
+            float pushBackDistance = 3.0f; 
+			
+           	drone.position[0] -= drone.direction[0] * pushBackDistance;
+            drone.position[1] -= drone.direction[1] * pushBackDistance;
+            drone.position[2] -= drone.direction[2] * pushBackDistance;
 
-	for (FlyingObject &obj : flyingObjects) {
-		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
-			printf("COLLISION with FLYING object!");
-		}
-	}
+            // Freeze movement direction so it doesn't push into the obstacle again
+            drone.direction[0] = 0.0f;
+            drone.direction[1] = 0.0f;
+            drone.direction[2] = 0.0f;
 
-	for (LampPost &obj : lampPosts) {
-		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
-			printf("COLLISION with LAMPPOST object!");
-		}
-	}
+            collisionPushedBack = true;
+        }
 
-	for (Tree &obj : trees) {
-		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
-			printf("COLLISION with TREE object!");
-		}
-	}
+        collisionAnimTimer += dt;
+		printf("the collision anime itmer: %f", collisionAnimTimer);
+        if (collisionAnimTimer >= collisionAnimDuration) { 
+			printf("entreou state normalll");
+            droneState = NORMAL;  // back to normal movement
+        }
+    }
 
-    updateDrone(dt);
 	updateFlyingObjects();
 	updateCamera2();
     updateCameras();
@@ -686,8 +821,9 @@ void renderSim(void)
 
 		// Center & rotate drone
 		mu.translate(gmu::MODEL, bodyWidth * 0.5f, bodyHeight * 0.5f, bodyDepth * 0.5f);
-		mu.rotate(gmu::MODEL, yawDeg, 0.0f, 1.0f, 0.0f);
-		mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f);
+		mu.rotate(gmu::MODEL, drone.rotation[0], 1.0f, 0.0f, 0.0f);
+		mu.rotate(gmu::MODEL, drone.rotation[2], 0.0f, 0.0f, 1.0f);
+		mu.rotate(gmu::MODEL, drone.rotation[1], 0.0f, 1.0f, 0.0f);
 		mu.translate(gmu::MODEL, -bodyWidth * 0.5f, -bodyHeight * 0.5f, -bodyDepth * 0.5f);
 
 		// Scale and render body
@@ -711,7 +847,7 @@ void renderSim(void)
 		// --- Drone motors ---
 		const float motorRadius = 2.0f;
 		const float motorHeight = 2.0f;
-		const float motorYOffset = bodyHeight + motorHeight * 0.5f;
+		const float motorYOffset = bodyHeight;
 
 		struct Vec3 { float x, y, z; };
 		Vec3 motorOffsets[4] = {
