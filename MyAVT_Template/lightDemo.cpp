@@ -527,11 +527,13 @@ void updateCameras(){
 
 	mu.loadIdentity(gmu::PROJECTION);
 
-	if (activeCam == 0 || activeCam == 2) {
+	if (activeCam == 2) {
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
 	} else if (activeCam == 1 ) {
-		float orthoSize = 60.0f;
-		mu.ortho(-orthoSize * ratio, orthoSize * ratio, -orthoSize, orthoSize, -500.0f, 500.0f);
+		mu.ortho(-zoomCam2 * ratio, zoomCam2 * ratio,-zoomCam2, zoomCam2, -500.0f, 500.0f);
+	} else if (activeCam == 0) {
+		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
+		cams[0].camPos[1] = zoomCam1;
 	}
 }
 
