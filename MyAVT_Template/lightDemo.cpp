@@ -64,6 +64,8 @@ float startYawDeg = 0.f, startPitchDeg = 0.f;
 float startFollowDistance = 20.f;
 // Zoom sensitivity (world units per pixel of RMB drag)
 float ZOOM_SENS = 0.05f;
+float zoomCam1 = 200.0f;  // start height for top view
+float zoomCam2 = 60.0f;   // ortho size
 
 float sYawDeg = 0.0f, sPitchDeg = 15.0f, sDist = 15.0f; // init to your defaults
 int prevX = 0, prevY = 0;
@@ -373,7 +375,7 @@ void moveDrone() {
 }
 
 void updateDrone(float dt) {
-	const float MAX_VSPEED = 0.1f;
+	const float MAX_VSPEED = 0.05f;
 	drone.rotation[1] = fmodf(drone.rotation[1], 360.0f);
 	if (drone.rotation[1] < 0.0f) drone.rotation[1] += 360.0f;
 	if (drone.speed == 0) {
@@ -382,22 +384,22 @@ void updateDrone(float dt) {
 		drone.direction[2] = 0.0f;
 	}
 	if (keyStates['w']) {
-		if (drone.speed < 0.5) drone.speed += MAX_VSPEED;
+		if (drone.speed < 0.2) drone.speed += MAX_VSPEED;
 		if (drone.direction[1] < 1.0f) drone.direction[1] += MAX_VSPEED;
 	}
 
 	if (keyStates['s']) {
-		if (drone.speed < 0.5) drone.speed += MAX_VSPEED;
+		if (drone.speed < 0.2) drone.speed += MAX_VSPEED;
 		if (drone.direction[1] > -1.0f) drone.direction[1] -= MAX_VSPEED;
 
 	}
 
 	if (keyStates['a']) {
-		if (drone.velRot < 3.0) drone.velRot += 0.1f;
+		if (drone.velRot < 1.0) drone.velRot += 0.05f;
 		rotateDrone(0.0f, 3.0f, 0.0f);
 	}
 	if (keyStates['d']) {
-		if (drone.velRot > -3.0) drone.velRot -= 0.1f;
+		if (drone.velRot > -1.0) drone.velRot -= 0.05f;
 		rotateDrone(0.0f, -3.0f, 0.0f);
 	}
 
@@ -990,8 +992,8 @@ void renderSim(void)
 	glDepthMask(GL_FALSE);
 	for (LampPost &lamp : lampPosts) {
         mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, lamp.position[0], lamp.height, lamp.position[2]);
-        mu.scale(gmu::MODEL, 0.6f, 0.6f, 0.6f);
+        mu.translate(gmu::MODEL, lamp.position[0], lamp.height + 1.5, lamp.position[2]);
+        mu.scale(gmu::MODEL, 1.5f, 1.5f, 1.5f);
         mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
         mu.computeNormalMatrix3x3();
 
@@ -1120,8 +1122,19 @@ void processMouseMotion(int xx, int yy) {
         startY = yy;
     }
     else if (tracking == 2) { // right mouse button: zoom
-        followDistance += deltaY * 0.1f;
-        if (followDistance < 1.0f) followDistance = 1.0f;
+		if (activeCam == 2) { // drone follow cam
+			followDistance += deltaY * 0.1f;
+			if (followDistance < 1.0f) followDistance = 1.0f;
+		}
+		else if (activeCam == 0) { // top perspective
+			zoomCam1 += deltaY * 0.5f;
+			if (zoomCam1 < 10.0f) zoomCam1 = 10.0f;
+		}
+		else if (activeCam == 1) { // top orthographic
+			zoomCam2 += deltaY * 0.5f;
+			if (zoomCam2 < 5.0f) zoomCam2 = 5.0f;
+		}
+
         startX = xx;
         startY = yy;
     }
