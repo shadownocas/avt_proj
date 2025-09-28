@@ -1389,8 +1389,7 @@ int main(int argc, char **argv)
 	glutReshapeFunc(changeSize);
 
 	glutTimerFunc(0, timer, 0);
-	glutIdleFunc(renderSim); // Use it for maximum performance
-	// glutTimerFunc(0, refresh, 0);    //use it to to get 60 FPS whatever
+	glutTimerFunc(0, refresh, 0);    //use it to to get 60 FPS whatever
 
 	//	Mouse and Keyboard Callbacks
 	glutKeyboardFunc(processKeys);
