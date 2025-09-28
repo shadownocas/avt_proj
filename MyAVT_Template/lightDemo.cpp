@@ -164,7 +164,7 @@ std::vector<Tree> trees;
 
 enum DroneState {
     NORMAL,
-    COLLISION_ANIM
+    COLLISION_ANIM,
 };
 
 DroneState droneState = NORMAL;
@@ -231,6 +231,7 @@ float lampHeight = 10.0f;
 float lampOffset = (10.0f + gap) / 2.0f + 2.0f; // push them to the side of diagonal 10 = buildingWidth
 
 bool fontLoaded = false;
+bool flyingColision = false;
 
 std::vector<Building> buildings;
 std::vector<std::vector<float>> buildingHeights(rows, std::vector<float>(cols));
@@ -293,7 +294,7 @@ void changeSize(int w, int h)
 	int m_viewport[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
 	mu.loadIdentity(gmu::PROJECTION);
-	if (activeCam == 0)
+	if (activeCam == 0 || activeCam == 2)
 	{
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
 		printf("entra change size prespectiev");
@@ -359,20 +360,21 @@ inline float clampf(float v, float lo, float hi)
 									: v;
 }
 
-void rotateDrone(float x, float y, float z) {
-	drone.rotation[0] += x;
-	drone.rotation[1] += drone.velRot;
-	drone.rotation[2] += z;
+void rotateDrone(float x, float y, float z, float dt) {
+	drone.rotation[0] += x * dt;
+	drone.rotation[1] += drone.velRot * dt;
+	drone.rotation[2] += z * dt;
 }
 
-void moveDrone() {
-	drone.position[0] += drone.direction[0] * drone.speed;
-	drone.position[1] += drone.direction[1] * drone.speed;
-	drone.position[2] += drone.direction[2] * drone.speed;
+void moveDrone(float dt) {
+	drone.position[0] += drone.direction[0] * drone.speed * dt;
+	drone.position[1] += drone.direction[1] * drone.speed * dt;
+	drone.position[2] += drone.direction[2] * drone.speed * dt;
 }
 
 void updateDrone(float dt) {
-	const float MAX_VSPEED = 0.05f;
+	const float MAX_VSPEED = 1.0f;
+
 	drone.rotation[1] = fmodf(drone.rotation[1], 360.0f);
 	if (drone.rotation[1] < 0.0f) drone.rotation[1] += 360.0f;
 	if (drone.speed == 0) {
@@ -381,27 +383,27 @@ void updateDrone(float dt) {
 		drone.direction[2] = 0.0f;
 	}
 	if (keyStates['w']) {
-		if (drone.speed < 0.2) drone.speed += MAX_VSPEED;
+		if (drone.speed < 4.0f) drone.speed += MAX_VSPEED;
 		if (drone.direction[1] < 1.0f) drone.direction[1] += MAX_VSPEED;
 	}
 
 	if (keyStates['s']) {
-		if (drone.speed < 0.2) drone.speed += MAX_VSPEED;
+		if (drone.speed < 4.0f) drone.speed += MAX_VSPEED;
 		if (drone.direction[1] > -1.0f) drone.direction[1] -= MAX_VSPEED;
 
 	}
 
 	if (keyStates['a']) {
-		if (drone.velRot < 1.0) drone.velRot += 0.05f;
-		rotateDrone(0.0f, 3.0f, 0.0f);
+		if (drone.velRot < 20.0) drone.velRot += 2.0f;
+		rotateDrone(0.0f, 3.0f, 0.0f, dt);
 	}
 	if (keyStates['d']) {
-		if (drone.velRot > -1.0) drone.velRot -= 0.05f;
-		rotateDrone(0.0f, -3.0f, 0.0f);
+		if (drone.velRot > -20.0) drone.velRot -= 2.0f;
+		rotateDrone(0.0f, -3.0f, 0.0f, dt);
 	}
 
 	if (spKeys[GLUT_KEY_DOWN]) {
-		if (drone.speed < 0.5) drone.speed += 0.01f;
+		if (drone.speed < 12.0f) drone.speed += 2.0f;
 		drone.direction[1] -= 0.005f;
 		float yawRad = mu.DegToRad(drone.rotation[1]);
 
@@ -420,7 +422,7 @@ void updateDrone(float dt) {
 	}
 
 	if (spKeys[GLUT_KEY_UP]) {
-		if (drone.speed < 0.5) drone.speed += 0.01f;
+		if (drone.speed < 12.0f) drone.speed += 2.0f;
 		drone.direction[1] -= 0.005f;
 		float yawRad = mu.DegToRad(drone.rotation[1]);
 		drone.direction[0] += sinf(yawRad) * 0.1f;
@@ -438,7 +440,7 @@ void updateDrone(float dt) {
 	}
 
 	if (spKeys[GLUT_KEY_LEFT]) {
-		if (drone.speed < 0.5) drone.speed += 0.01f;
+		if (drone.speed < 12.0f) drone.speed += 2.0f;
 		drone.direction[1] -= 0.005f;
 		float yawRad = mu.DegToRad(drone.rotation[1]);
 
@@ -457,7 +459,7 @@ void updateDrone(float dt) {
 	}
 
 	if (spKeys[GLUT_KEY_RIGHT]) {
-		if (drone.speed < 0.5) drone.speed += 0.01f;
+		if (drone.speed < 12.0f) drone.speed += 2.0f;
 		drone.direction[1] -= 0.005f;
 		float yawRad = mu.DegToRad(drone.rotation[1]);
 
@@ -512,7 +514,7 @@ void updateDrone(float dt) {
 		drone.velRot = 0.0f;
 	}
 
-	moveDrone();
+	moveDrone(dt);
 }
 
 void updateCameras(){
@@ -564,16 +566,15 @@ bool checkAABBCollision(const float minA[3], const float maxA[3], const float mi
     return true;
 }
 
-void updateFlyingObjects(){
+void updateFlyingObjects(float dt){
 	for (auto &obj : flyingObjects)
 	{
 		// Move forward
-		obj.position[0] += obj.direction[0] * obj.speed;
-		obj.position[1] += obj.direction[1] * obj.speed;
-		obj.position[2] += obj.direction[2] * obj.speed;
+		obj.position[0] += obj.direction[0] * obj.speed * dt;
+		obj.position[1] += obj.direction[1] * obj.speed * dt;
+		obj.position[2] += obj.direction[2] * obj.speed * dt;
 
-		// Increase speed slightly with play time
-		obj.speed *= 1.0001f;
+		obj.speed *= 1.001f;
 
 		// Respawn if out of visible region
 		if (fabs(obj.position[0]) > 150 || fabs(obj.position[2]) > 150)
@@ -587,7 +588,7 @@ void updateFlyingObjects(){
 			obj.direction[1] = 0.0f;
 			obj.direction[2] = sin(angle);
 
-			obj.speed = 0.05f + (rand() % 10) * 0.01f;
+			obj.speed = 4.0f;
 			obj.rotationAngle = 0.0f;
 		}
 	}
@@ -619,6 +620,7 @@ void update(){
 			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
 				printf("COLLISION with FLYING object!");
 				collisionDetected = true;
+				flyingColision = true;
 			}
 		}
 
@@ -650,31 +652,43 @@ void update(){
 		}
 	}
 	else if (droneState == COLLISION_ANIM) {
-        // Push back once
-        if (!collisionPushedBack) {
-            float pushBackDistance = 3.0f; 
-			
-           	drone.position[0] -= drone.direction[0] * pushBackDistance;
-            drone.position[1] -= drone.direction[1] * pushBackDistance;
-            drone.position[2] -= drone.direction[2] * pushBackDistance;
 
-            // Freeze movement direction so it doesn't push into the obstacle again
-            drone.direction[0] = 0.0f;
-            drone.direction[1] = 0.0f;
-            drone.direction[2] = 0.0f;
+		if (flyingColision == true) {
+			// Reset to initial position
+			drone.position[0] = 20.0f;
+			drone.position[1] = 20.0f;
+			drone.position[2] = -20.0f;
 
-            collisionPushedBack = true;
-        }
+			drone.direction[0] = 0.0f;
+			drone.direction[1] = 0.0f;
+			drone.direction[2] = 0.0f;
+			flyingColision = false;
+			droneState = NORMAL;
+		} 
+		else{// Push back once
+			if (!collisionPushedBack) {
+				float pushBackDistance = 3.0f; 
+				
+				drone.position[0] -= drone.direction[0] * pushBackDistance;
+				drone.position[1] -= drone.direction[1] * pushBackDistance;
+				drone.position[2] -= drone.direction[2] * pushBackDistance;
 
-        collisionAnimTimer += dt;
-		printf("the collision anime itmer: %f", collisionAnimTimer);
-        if (collisionAnimTimer >= collisionAnimDuration) { 
-			printf("entreou state normalll");
-            droneState = NORMAL;  // back to normal movement
-        }
+				// Freeze movement
+				drone.direction[0] = 0.0f;
+				drone.direction[1] = 0.0f;
+				drone.direction[2] = 0.0f;
+
+				collisionPushedBack = true;
+			}
+
+			collisionAnimTimer += dt;
+			if (collisionAnimTimer >= collisionAnimDuration) { 
+				droneState = NORMAL;
+			}
+		}
     }
 
-	updateFlyingObjects();
+	updateFlyingObjects(dt);
 	updateCamera2();
     updateCameras();
 }
@@ -1274,7 +1288,7 @@ void buildScene()
 		obj.direction[1] = 0.0f;
 		obj.direction[2] = sin(angle);
 
-		obj.speed = 0.05f + (rand() % 10) * 0.01f;
+		obj.speed = 4.0f;
 		obj.rotationAngle = 0.0f;
 		obj.rotationSpeed = 1.0f + (rand() % 5);
 		obj.meshID = 2 + (i % 2);				 // 2 = sphere, 3 = cone
