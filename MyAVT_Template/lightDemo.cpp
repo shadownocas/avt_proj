@@ -1145,16 +1145,22 @@ void processMouseMotion(int xx, int yy) {
 void mouseWheel(int wheel, int direction, int x, int y)
 {
 
-	r += direction * 0.1f;
-	if (r < 0.1f)
-		r = 0.1f;
+	// direction is +1 (scroll up) or -1 (scroll down)
+    float delta = (float)direction;
 
-	/* camX = r * sin(alpha * 3.14f / 180.0f) * cos(beta * 3.14f / 180.0f);
-	camZ = r * cos(alpha * 3.14f / 180.0f) * cos(beta * 3.14f / 180.0f);
-	camY = r *   						     sin(beta * 3.14f / 180.0f); */
-
-	//  uncomment this if not using an idle or refresh func
-	//	glutPostRedisplay();
+    if (activeCam == 2) { // drone follow cam
+        followDistance -= delta * 0.5f;
+        if (followDistance < 1.0f) followDistance = 1.0f;
+    }
+    else if (activeCam == 0) { // top perspective
+        zoomCam1 -= delta * 5.0f;
+        if (zoomCam1 < 10.0f) zoomCam1 = 10.0f;
+    }
+    else if (activeCam == 1) { // top orthographic
+        zoomCam2 -= delta * 2.0f;
+        if (zoomCam2 < 5.0f) zoomCam2 = 5.0f;
+    }
+	
 }
 
 void processSpecialDown(int key, int x, int y)
