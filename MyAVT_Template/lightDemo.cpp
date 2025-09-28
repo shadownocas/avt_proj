@@ -674,17 +674,25 @@ void renderSim(void)
 	renderer.renderMesh(data);
 	mu.popMatrix(gmu::MODEL);
 
-	// --- Draw drone (green cube body + 4 white motors) ---
+	// --- Draw improved drone ---
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
-	const float bodyX = 1.6f, bodyY = 0.25f, bodyZ = 1.6f;
-	mu.translate(gmu::MODEL, bodyX * 0.5f, bodyY * 0.5f, bodyZ * 0.5f);	   // to center
-	mu.rotate(gmu::MODEL, yawDeg, 0.0f, 1.0f, 0.0f);					   // yaw (A/D)
-	mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f);					   // slight nose tilt (UP/DOWN)
-	mu.translate(gmu::MODEL, -bodyX * 0.5f, -bodyY * 0.5f, -bodyZ * 0.5f); // back
 
+	// --- Drone body ---
+	// Dimensions
+	const float bodyWidth  = 1.0f;
+	const float bodyHeight = 0.5f; // taller body
+	const float bodyDepth  = 1.0f;
+
+	// Center & rotate drone
+	mu.translate(gmu::MODEL, bodyWidth * 0.5f, bodyHeight * 0.5f, bodyDepth * 0.5f);
+	mu.rotate(gmu::MODEL, yawDeg, 0.0f, 1.0f, 0.0f);   // yaw (A/D)
+	mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f); // pitch (UP/DOWN)
+	mu.translate(gmu::MODEL, -bodyWidth * 0.5f, -bodyHeight * 0.5f, -bodyDepth * 0.5f);
+
+	// Scale and render body
 	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, bodyX, bodyY, bodyZ);
+	mu.scale(gmu::MODEL, bodyWidth, bodyHeight, bodyDepth);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 	mu.computeNormalMatrix3x3();
 
@@ -692,7 +700,6 @@ void renderSim(void)
 	AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix); //WORLD SPACEE
 	drone.worldAABB = aabbBox;
 
-	data.texMode = 1; // material shading
 	data.mesh = &allMeshes.cube;
 	data.texMode = 4;
 	data.vm = mu.get(gmu::VIEW_MODEL);
@@ -701,37 +708,39 @@ void renderSim(void)
 	renderer.renderMesh(data);
 	mu.popMatrix(gmu::MODEL);
 
-	// 2) MOTORS (4 short white cylinders) — attached to the same parent frame
-	const float motorR = 0.22f; // radius
-	const float motorH = 0.15f; // height
+	// --- Drone motors ---
+	const float motorRadius = 2.0f;
+	const float motorHeight = 2.0f;
+	const float motorYOffset = bodyHeight + motorHeight * 0.5f;
 
-	// TOP of the cube is at Y = bodyY because cube vertices are 0..1
-	const float motorY = bodyY + motorH * 0.5f; // center sits just above the top face
+	// Motor positions relative to body
+	struct Vec3 { float x, y, z; };
+	Vec3 motorOffsets[4] = {
+		{0.0f, motorYOffset, 0.0f},
+		{bodyWidth, motorYOffset, 0.0f},
+		{0.0f, motorYOffset, bodyDepth},
+		{bodyWidth, motorYOffset, bodyDepth}
+	};
 
-	// If you want the motors TANGENT to the two edges (fully on top surface):
-	auto placeMotor = [&](float x, float z)
-	{
+	for (int i = 0; i < 4; i++) {
 		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, x, motorY, z);
-		mu.scale(gmu::MODEL, motorR, motorH, motorR); // cylinder axis = Y
+		mu.translate(gmu::MODEL, motorOffsets[i].x, motorOffsets[i].y, motorOffsets[i].z);
+		mu.scale(gmu::MODEL, motorRadius, motorHeight, motorRadius);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 
-		data.mesh = &allMeshes.cube;
-		data.texMode = 1;
+		data.mesh = &allMeshes.torus;
+		data.texMode = 4;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
 		renderer.renderMesh(data);
-		mu.popMatrix(gmu::MODEL);
-	};
 
-	placeMotor(0.f, 0.f);
-	placeMotor(bodyX, 0.f);
-	placeMotor(0.f, bodyZ);
-	placeMotor(bodyX, bodyZ);
+		mu.popMatrix(gmu::MODEL);
+	}
 
 	mu.popMatrix(gmu::MODEL);
+
 
 	// horizontal street/road
 	mu.pushMatrix(gmu::MODEL);
@@ -860,7 +869,7 @@ void renderSim(void)
 	renderer.setLampLights(pointLights, lampsOn);
 
 	// --------- Draw bulb ----------
-	glDepthMask(GL_FALSE);  // don’t write depth while blending
+	glDepthMask(GL_FALSE);
 	for (LampPost &lamp : lampPosts) {
         mu.pushMatrix(gmu::MODEL);
         mu.translate(gmu::MODEL, lamp.position[0], lamp.height, lamp.position[2]);
@@ -1058,6 +1067,11 @@ void buildScene()
 	float specBulb[] = {0.5f, 0.5f, 0.3f, 0.3f};
 	float emisBulb[] = {1.0f, 1.0f, 0.2f, 0.3f};
 
+	float ambMotor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+	float diffMotor[] = {0.05f, 0.05f, 0.05f, 1.0f};
+	float specMotor[] = {0.2f, 0.2f, 0.2f, 1.0f};
+	float emisMotor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+
 
 	float emissive[] = {0.0f, 0.0f, 0.0f, 1.0f};
 	float shininess = 100.0f;
@@ -1098,6 +1112,16 @@ void buildScene()
 	memcpy(allMeshes.cone.mat.emissive, emissive, 4 * sizeof(float));
 	allMeshes.cone.mat.shininess = shininess;
 	allMeshes.cone.mat.texCount = texcount;
+
+	// Torus
+	allMeshes.torus = createTorus(0.1f, 0.2f, 16, 12);
+	memcpy(allMeshes.torus.mat.ambient, ambMotor, 4 * sizeof(float));
+	memcpy(allMeshes.torus.mat.diffuse, diffMotor, 4 * sizeof(float));
+	memcpy(allMeshes.torus.mat.specular, specMotor, 4 * sizeof(float));
+	memcpy(allMeshes.torus.mat.emissive, emisMotor, 4 * sizeof(float));
+	allMeshes.torus.mat.shininess = shininess;
+	allMeshes.torus.mat.texCount = texcount;
+
 
 	// ----- INITIALIZE FLYING OBJECTS -----
 	for (int i = 0; i < 10; i++)

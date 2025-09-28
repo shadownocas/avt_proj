@@ -39,6 +39,7 @@ struct MeshCollection {
     MyMesh cube;
     MyMesh sphere;
     MyMesh cone;
+	MyMesh torus;
 };
 
 MyMesh createCube();
