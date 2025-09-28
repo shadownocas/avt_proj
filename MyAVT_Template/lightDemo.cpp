@@ -667,7 +667,7 @@ void renderSim(void)
 	mu.computeNormalMatrix3x3();
 
 	data.mesh = &allMeshes.quad;
-	data.texMode = 2;
+	data.texMode = 10; //multiple texturing
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
@@ -741,25 +741,6 @@ void renderSim(void)
 
 	mu.popMatrix(gmu::MODEL);
 
-
-	// horizontal street/road
-	mu.pushMatrix(gmu::MODEL);
-	{
-		float streetLenX = cols * (buildingW + gap);
-		mu.translate(gmu::MODEL, 5.0f, 0.2f, 0.0f);
-		mu.scale(gmu::MODEL, streetWidth, 1.0f, streetLenX);
-		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
-		data.mesh = &allMeshes.quad;
-		data.texMode = 6;
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
-		mu.loadIdentity(gmu::MODEL);
-	}
-	mu.popMatrix(gmu::MODEL);
 
 	// --- Garden (central park) ---
 	mu.pushMatrix(gmu::MODEL);

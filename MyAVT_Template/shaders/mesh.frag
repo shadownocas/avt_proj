@@ -47,7 +47,7 @@ uniform sampler2D texmap2;
 uniform sampler2D texmap3;  
 uniform sampler2D texmap4;  
 uniform sampler2D texmap5;  
-uniform sampler2D texmap6;  
+uniform sampler2D texmap6;
 
 // Directional light
 uniform vec3 dirLightDir;   
@@ -167,9 +167,22 @@ void main() {
         colorOut = vec4(finalColor, 1.0);
     }
     else {
-        texel = texture(texmap2, DataIn.tex_coord);
-        texel1 = texture(texmap1, DataIn.tex_coord);
-        vec3 finalColor = max(intensity * texel.rgb * texel1.rgb + spec.rgb, 0.07 * texel.rgb * texel1.rgb);
+        texel = texture(texmap, DataIn.tex_coord);
+        float stripeStart = 0.45;
+        float stripeEnd   = 0.6;
+
+        vec3 finalTexture;
+        if (DataIn.tex_coord.x > stripeStart && DataIn.tex_coord.x < stripeEnd) {
+            float stripeU = (DataIn.tex_coord.x - stripeStart) / (stripeEnd - stripeStart);
+            vec2 stripeUV = vec2(stripeU, DataIn.tex_coord.y);
+
+            texel1 = texture(texmap6, stripeUV);
+            finalTexture = texel1.rgb;
+        } 
+        else {
+            finalTexture = texel.rgb;
+        }
+        vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb * texel1.rgb);
         colorOut = vec4(finalColor, 1.0);
     }
 }
