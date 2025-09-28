@@ -148,6 +148,12 @@ struct Building
 	AABB worldAABB;
 };
 
+struct FloorObject
+{
+	AABB aabb;
+	AABB worldAABB;
+} floorObj;
+
 std::vector<PointLight> pointLights;
 
 std::vector<FlyingObject> flyingObjects;
@@ -266,12 +272,6 @@ void refresh(int value) // faz RENDER
 	glutTimerFunc(1000 / 60, refresh, 0);
 }
 
-void animate()
-{	// UPDATE das posicoes e no render desenha!
-	/* vel = theta * ...;
-	pos += vel * deltaT */
-}
-
 // ------------------------------------------------------------
 //
 // Reshape Callback Function
@@ -311,7 +311,6 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
     for (int i = 0; i < 8; i++) {
         float* c = obj.corners[i];
 
-        // Matrix × Vector (column-major order)
         float x = modelMatrix[0] * c[0] + modelMatrix[4] * c[1] + modelMatrix[8]  * c[2] + modelMatrix[12];
         float y = modelMatrix[1] * c[0] + modelMatrix[5] * c[1] + modelMatrix[9]  * c[2] + modelMatrix[13];
         float z = modelMatrix[2] * c[0] + modelMatrix[6] * c[1] + modelMatrix[10] * c[2] + modelMatrix[14];
@@ -338,7 +337,6 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
         globalMax[2] = std::max(globalMax[2], z);
     }
 
-    // Save results
     obj.aabbmin[0] = globalMin[0];
     obj.aabbmin[1] = globalMin[1];
     obj.aabbmin[2] = globalMin[2];
@@ -346,7 +344,6 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
     obj.aabbmax[0] = globalMax[0];
     obj.aabbmax[1] = globalMax[1];
     obj.aabbmax[2] = globalMax[2];
-	//printf("aabbUPDATEDDD min x: %f y: %f z: %f\n", obj.aabbmin[0], obj.aabbmin[1], obj.aabbmin[2]);
 
     return obj;
 }
@@ -407,12 +404,10 @@ void updateDrone(float dt) {
 		if (drone.speed < 0.5) drone.speed += 0.01f;
 		drone.direction[1] -= 0.005f;
 		float yawRad = mu.DegToRad(drone.rotation[1]);
-		/* drone.direction[0] += cosf(yawRad) * 0.1f;
-		drone.direction[2] += -sinf(yawRad) * 0.1f; */
+
 		drone.direction[0] += -sinf(yawRad) * 0.1f;
 		drone.direction[2] += -cosf(yawRad) * 0.1f;
 		
-
 		float rotX = drone.rotation[0] + 0.5f * -cosf(yawRad);
 		float rotZ = drone.rotation[2] + 0.5f * sinf(yawRad);
 		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
@@ -446,9 +441,6 @@ void updateDrone(float dt) {
 		if (drone.speed < 0.5) drone.speed += 0.01f;
 		drone.direction[1] -= 0.005f;
 		float yawRad = mu.DegToRad(drone.rotation[1]);
-
-		/* drone.direction[0] += sinf(yawRad) * 0.1f;
-		drone.direction[2] += cosf(yawRad) * 0.1f; */
 
 		drone.direction[0] += cosf(yawRad) * 0.1f;
 		drone.direction[2] += -sinf(yawRad) * 0.1f;
@@ -522,6 +514,7 @@ void updateDrone(float dt) {
 
 	moveDrone();
 }
+
 void updateCameras(){
 	float ratio = (float)WinX / (float)WinY;
 
@@ -545,11 +538,9 @@ void updateCamera2()
     float pivotY = drone.position[1] + followHeight;
     float pivotZ = drone.position[2];
 
-    // --- Use drone.rotation[1] instead of drone.yaw ---
     float yawRad   = mu.DegToRad(drone.rotation[1] + followYawOffsetDeg);
     float pitchRad = mu.DegToRad(followPitchOffsetDeg);
 
-    // Camera follows behind the drone based on yaw & pitch
     float offsetX = followDistance * sinf(yawRad) * cosf(pitchRad);
     float offsetY = followDistance * sinf(pitchRad);
     float offsetZ = followDistance * cosf(yawRad) * cosf(pitchRad);
@@ -570,7 +561,7 @@ bool checkAABBCollision(const float minA[3], const float maxA[3], const float mi
             return false; 
         }
     }
-    return true; //collsionnn
+    return true;
 }
 
 void updateFlyingObjects(){
@@ -643,6 +634,11 @@ void update(){
 				printf("COLLISION with TREE object!");
 				collisionDetected = true;
 			}
+		}
+
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, floorObj.worldAABB.aabbmin, floorObj.worldAABB.aabbmax)) {
+			printf("COLLISION with FLOOR object!");
+			collisionDetected = true;
 		}
 
 		if (collisionDetected) {
@@ -804,6 +800,10 @@ void renderSim(void)
 		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
+
+		float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(floorObj.aabb, modelMatrix); //WORLD SPACEE
+		floorObj.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.quad;
 		data.texMode = 10; //multiple texturing
@@ -1000,7 +1000,7 @@ void renderSim(void)
         mu.computeNormalMatrix3x3();
 
         data.mesh = &allMeshes.sphere;
-        data.texMode = 2; //create new one FIX
+        data.texMode = 2;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1375,6 +1375,8 @@ void buildScene()
 		drone.direction[2] = -1.0f;
 		drone.aabb = allMeshes.cube.aabb; //cube
 	}
+
+	floorObj.aabb = allMeshes.quad.aabb;
 
 	cams[0].camPos[1] = 200.0;
 	cams[0].camPos[0] = 0.0;

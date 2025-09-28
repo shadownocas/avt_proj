@@ -139,11 +139,10 @@ void main() {
     }
     else if (texMode == 2) {
         texel = texture(texmap, DataIn.tex_coord);
-        float finalAlpha = texel.a * mat.diffuse.a;
-        if (finalAlpha <= alpha_threshold)
+        if (texel.a <= alpha_threshold)
             discard;
         vec3 finalColor = max(intensity * texel.rgb + spec.rgb, 0.07 * texel.rgb);
-        colorOut = vec4(finalColor, finalAlpha);
+        colorOut = vec4(finalColor, texel.a);
     }
 
     else if (texMode == 3) {

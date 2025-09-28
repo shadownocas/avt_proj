@@ -62,6 +62,21 @@ MyMesh createQuad(float size_x, float size_y) {
     glBindVertexArray(0);
   
 	amesh.type = GL_TRIANGLES;
+
+	amesh.aabb.aabbmin[0] = -size_x * 0.5f;
+	amesh.aabb.aabbmin[1] = -size_y * 0.5f;
+	amesh.aabb.aabbmin[2] = 0.0f;
+
+	amesh.aabb.aabbmax[0] =  size_x * 0.5f;
+	amesh.aabb.aabbmax[1] =  size_y * 0.5f;
+	amesh.aabb.aabbmax[2] = 0.0f;
+
+	for (int i = 0; i < 8; i++) {
+		amesh.aabb.corners[i][0] = (i & 1) ? amesh.aabb.aabbmax[0] : amesh.aabb.aabbmin[0];
+		amesh.aabb.corners[i][1] = (i & 2) ? amesh.aabb.aabbmax[1] : amesh.aabb.aabbmin[1];
+		amesh.aabb.corners[i][2] = (i & 4) ? amesh.aabb.aabbmax[2] : amesh.aabb.aabbmin[2];
+	}
+	
 	return(amesh);
 }
 
