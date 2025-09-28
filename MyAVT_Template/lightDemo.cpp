@@ -135,6 +135,15 @@ struct Tree {
     AABB worldAABB;
 };
 
+struct Building
+{
+	float position[3];
+	float width, depth;
+	int row, col; // indices no grid
+	AABB aabb;
+	AABB worldAABB;
+};
+
 std::vector<PointLight> pointLights;
 
 std::vector<FlyingObject> flyingObjects;
@@ -204,15 +213,6 @@ float lampHeight = 10.0f;
 float lampOffset = (10.0f + gap) / 2.0f + 2.0f; // push them to the side of diagonal 10 = buildingWidth
 
 bool fontLoaded = false;
-
-struct Building
-{
-	float x, z;
-	float width, depth;
-	int row, col; // indices no grid
-	AABB aabb;
-	AABB worldAABB;
-};
 
 std::vector<Building> buildings;
 std::vector<std::vector<float>> buildingHeights(rows, std::vector<float>(cols));
@@ -502,9 +502,7 @@ void updateFlyingObjects(){
 	}
 }
 
-void update(){ //UPDATE das posicoes e no render desenha!
-	 // Update drone movement
-	 // delta time (seconds)
+void update(){
 	static int prevMs = -1;
 	int nowMs = glutGet(GLUT_ELAPSED_TIME);
 	if (prevMs < 0)
@@ -515,7 +513,7 @@ void update(){ //UPDATE das posicoes e no render desenha!
 		dt = 0.001f;
 	if (dt > 0.033f)
 		dt = 0.033f;
-	
+
 	for (Building &b : buildings) {
 		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
 			printf("COLLISION with BUILDING object!");
@@ -555,7 +553,7 @@ void renderSim(void)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	renderer.activateRenderMeshesShaderProg(); // use the required GLSL program to draw the meshes with illumination
+	renderer.activateRenderMeshesShaderProg();
 
 	update();
 
@@ -571,16 +569,18 @@ void renderSim(void)
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::MODEL);
 
-	// set the camera using a function similar to gluLookAt
+	// set the camera
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
 			  cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0, 1, 0);
 
 	// Directional light
-	float dirLightWorld[4] = {0.5f, -0.7f, 0.3f, 0.0f};
-	float dirLightEye[4];
-	mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
-	float dirLightEye3[3] = {dirLightEye[0], dirLightEye[1], dirLightEye[2]};
-	renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
+	{
+		float dirLightWorld[4] = {0.5f, -0.7f, 0.3f, 0.0f};
+		float dirLightEye[4];
+		mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
+		float dirLightEye3[3] = {dirLightEye[0], dirLightEye[1], dirLightEye[2]};
+		renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
+	}
 
 	dataMesh data;
 
@@ -602,7 +602,6 @@ void renderSim(void)
 		float worldPos[4];
 		mu.multMatrixPoint(gmu::MODEL, localHeadlightOffsets[i], worldPos);
 
-		// Convert to eye space
 		float eyePos[4];
 		mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
 
@@ -610,7 +609,7 @@ void renderSim(void)
 		droneHeadlights[i].Position[1] = eyePos[1];
 		droneHeadlights[i].Position[2] = eyePos[2];
 
-		// Forward direction of drone (local Z axis)
+		// Forward direction of drone
 		float localDir[4] = {0.0f, 0.0f, 1.0f, 0.0f};
 		float worldDir[4];
 		mu.multMatrixPoint(gmu::MODEL, localDir, worldDir);
@@ -660,104 +659,106 @@ void renderSim(void)
 	}
 
 	// --- Draw floor ---
-	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
-	mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
-	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-	mu.computeNormalMatrix3x3();
-
-	data.mesh = &allMeshes.quad;
-	data.texMode = 10; //multiple texturing
-	data.vm = mu.get(gmu::VIEW_MODEL);
-	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-	data.normal = mu.getNormalMatrix();
-	renderer.renderMesh(data);
-	mu.popMatrix(gmu::MODEL);
-
-	// --- Draw improved drone ---
-	mu.pushMatrix(gmu::MODEL);
-	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
-
-	// --- Drone body ---
-	// Dimensions
-	const float bodyWidth  = 1.0f;
-	const float bodyHeight = 0.5f; // taller body
-	const float bodyDepth  = 1.0f;
-
-	// Center & rotate drone
-	mu.translate(gmu::MODEL, bodyWidth * 0.5f, bodyHeight * 0.5f, bodyDepth * 0.5f);
-	mu.rotate(gmu::MODEL, yawDeg, 0.0f, 1.0f, 0.0f);   // yaw (A/D)
-	mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f); // pitch (UP/DOWN)
-	mu.translate(gmu::MODEL, -bodyWidth * 0.5f, -bodyHeight * 0.5f, -bodyDepth * 0.5f);
-
-	// Scale and render body
-	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, bodyWidth, bodyHeight, bodyDepth);
-	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-	mu.computeNormalMatrix3x3();
-
-	float* modelMatrix = mu.get(gmu::MODEL);
-	AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix); //WORLD SPACEE
-	drone.worldAABB = aabbBox;
-
-	data.mesh = &allMeshes.cube;
-	data.texMode = 4;
-	data.vm = mu.get(gmu::VIEW_MODEL);
-	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-	data.normal = mu.getNormalMatrix();
-	renderer.renderMesh(data);
-	mu.popMatrix(gmu::MODEL);
-
-	// --- Drone motors ---
-	const float motorRadius = 2.0f;
-	const float motorHeight = 2.0f;
-	const float motorYOffset = bodyHeight + motorHeight * 0.5f;
-
-	// Motor positions relative to body
-	struct Vec3 { float x, y, z; };
-	Vec3 motorOffsets[4] = {
-		{0.0f, motorYOffset, 0.0f},
-		{bodyWidth, motorYOffset, 0.0f},
-		{0.0f, motorYOffset, bodyDepth},
-		{bodyWidth, motorYOffset, bodyDepth}
-	};
-
-	for (int i = 0; i < 4; i++) {
+	{	
 		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, motorOffsets[i].x, motorOffsets[i].y, motorOffsets[i].z);
-		mu.scale(gmu::MODEL, motorRadius, motorHeight, motorRadius);
+		mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
+		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 
-		data.mesh = &allMeshes.torus;
+		data.mesh = &allMeshes.quad;
+		data.texMode = 10; //multiple texturing
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+	}
+
+	// --- Draw drone ---
+	{
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
+
+		const float bodyWidth  = 1.0f;
+		const float bodyHeight = 0.5f;
+		const float bodyDepth  = 1.0f;
+
+		// Center & rotate drone
+		mu.translate(gmu::MODEL, bodyWidth * 0.5f, bodyHeight * 0.5f, bodyDepth * 0.5f);
+		mu.rotate(gmu::MODEL, yawDeg, 0.0f, 1.0f, 0.0f);
+		mu.rotate(gmu::MODEL, pitchDeg, 1.0f, 0.0f, 0.0f);
+		mu.translate(gmu::MODEL, -bodyWidth * 0.5f, -bodyHeight * 0.5f, -bodyDepth * 0.5f);
+
+		// Scale and render body
+		mu.pushMatrix(gmu::MODEL);
+		mu.scale(gmu::MODEL, bodyWidth, bodyHeight, bodyDepth);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+
+		float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix); //WORLD SPACEE
+		drone.worldAABB = aabbBox;
+
+		data.mesh = &allMeshes.cube;
 		data.texMode = 4;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
 		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+
+		// --- Drone motors ---
+		const float motorRadius = 2.0f;
+		const float motorHeight = 2.0f;
+		const float motorYOffset = bodyHeight + motorHeight * 0.5f;
+
+		struct Vec3 { float x, y, z; };
+		Vec3 motorOffsets[4] = {
+			{0.0f, motorYOffset, 0.0f},
+			{bodyWidth, motorYOffset, 0.0f},
+			{0.0f, motorYOffset, bodyDepth},
+			{bodyWidth, motorYOffset, bodyDepth}
+		};
+
+		for (int i = 0; i < 4; i++) {
+			mu.pushMatrix(gmu::MODEL);
+			mu.translate(gmu::MODEL, motorOffsets[i].x, motorOffsets[i].y, motorOffsets[i].z);
+			mu.scale(gmu::MODEL, motorRadius, motorHeight, motorRadius);
+			mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+			mu.computeNormalMatrix3x3();
+
+			data.mesh = &allMeshes.torus;
+			data.texMode = 4;
+			data.vm = mu.get(gmu::VIEW_MODEL);
+			data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+			data.normal = mu.getNormalMatrix();
+			renderer.renderMesh(data);
+
+			mu.popMatrix(gmu::MODEL);
+		}
 
 		mu.popMatrix(gmu::MODEL);
 	}
 
-	mu.popMatrix(gmu::MODEL);
+	// --- Draw garden ---
+	{
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
+		mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
+		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+		data.mesh = &allMeshes.quad;
+		data.texMode = 5;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+	}
 
-
-	// --- Garden (central park) ---
-	mu.pushMatrix(gmu::MODEL);
-	mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
-	mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
-	mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
-	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-	mu.computeNormalMatrix3x3();
-	data.mesh = &allMeshes.quad;
-	data.texMode = 5;
-	data.vm = mu.get(gmu::VIEW_MODEL);
-	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-	data.normal = mu.getNormalMatrix();
-	renderer.renderMesh(data);
-	mu.popMatrix(gmu::MODEL);
-
-	// place some low 'tree' cones around garden
+	// --- Draw trees ---
 	for (Tree &tree : trees) {
         mu.pushMatrix(gmu::MODEL);
         mu.translate(gmu::MODEL, tree.position[0], tree.position[1], tree.position[2]);
@@ -779,12 +780,12 @@ void renderSim(void)
         mu.popMatrix(gmu::MODEL);
     }
 
-	// --- Draw buildings using buildings vector ---
+	// --- Draw buildings ---
 	for (Building &b : buildings)
 	{
 		float h = buildingHeights[b.row][b.col];
 		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, b.x, 0, b.z);
+		mu.translate(gmu::MODEL, b.position[0], 0, b.position[2]);
 
 		mu.scale(gmu::MODEL, b.width, h, b.depth);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
@@ -807,6 +808,7 @@ void renderSim(void)
 
 	pointLights.clear();
 
+	// --------- Draw lamp post ----------
 	for (LampPost &lamp : lampPosts) {
         float lx = lamp.position[0];
         float ly = lamp.height;
@@ -828,7 +830,6 @@ void renderSim(void)
         pl.atten.exp      = 0.02f;
         pointLights.push_back(pl);
 
-        // --------- Draw lamp post ----------
         mu.pushMatrix(gmu::MODEL);
         mu.translate(gmu::MODEL, lx, 0, lz);
         mu.scale(gmu::MODEL, 0.25f, lamp.height, 0.25f);
@@ -968,8 +969,6 @@ void processMouseButtons(int button, int state, int xx, int yy)
 }
 
 // Track mouse motion while buttons are pressed
-
-
 void processMouseMotion(int xx, int yy) {
     int deltaX = xx - startX;
     int deltaY = yy - startY;
@@ -1109,33 +1108,29 @@ void buildScene()
 	{
 		FlyingObject obj;
 
-		// random spawn position in XZ plane
 		obj.position[0] = (rand() % 200 - 100);
-		obj.position[1] = 10.0f + rand() % 30; // altitude between 10–40
+		obj.position[1] = 10.0f + rand() % 30;
 		obj.position[2] = (rand() % 200 - 100);
 
-		// random direction in XZ plane
 		float angle = (rand() % 360) * 3.14159f / 180.0f;
 		obj.direction[0] = cos(angle);
 		obj.direction[1] = 0.0f;
 		obj.direction[2] = sin(angle);
 
-		obj.speed = 0.05f + (rand() % 10) * 0.01f; // 0.05 – 0.15
+		obj.speed = 0.05f + (rand() % 10) * 0.01f;
 		obj.rotationAngle = 0.0f;
-		obj.rotationSpeed = 1.0f + (rand() % 5); // 1 – 5 degrees per frame
+		obj.rotationSpeed = 1.0f + (rand() % 5);
 		obj.meshID = 2 + (i % 2);				 // 2 = sphere, 3 = cone
 		obj.active = true;
 		obj.aabb = allMeshes.cube.aabb;
 		flyingObjects.push_back(obj);
 	}
 
-	// Clear and fill building vector
 	buildings.clear();
 	for (int r = 0; r < rows; ++r)
 	{
 		for (int c = 0; c < cols; ++c)
 		{
-			// compute standard position center for this grid cell
 			float x = offsetX + c * (buildingW + gap);
 			float z = offsetZ + r * (buildingD + gap);
 
@@ -1147,7 +1142,7 @@ void buildScene()
 			if (r == rows / 2)
 				isStreet = true;
 
-			// carve out the central garden area (a rectangle around center)
+			// carve out the central garden area
 			int gardenRowStart = rows / 2 - gardenSizeRows / 2;
 			int gardenRowEnd = gardenRowStart + gardenSizeRows - 1;
 			int gardenColStart = cols / 2 - gardenSizeCols / 2;
@@ -1157,8 +1152,8 @@ void buildScene()
 			if (!isStreet && !isGardenCell)
 			{
 				Building b;
-				b.x = x;
-				b.z = z;
+				b.position[0] = x;
+				b.position[2] = z;
 				b.width = buildingW;
 				b.depth = buildingD;
 				b.row = r;
@@ -1171,7 +1166,7 @@ void buildScene()
 			}
 			else
 			{
-				// leave empty: street or garden
+				// leave empty
 				buildingHeights[r][c] = 0.0f;
 			}
 		}
@@ -1187,7 +1182,7 @@ void buildScene()
 
         LampPost lamp;
         lamp.position[0] = lx;
-        lamp.position[1] = 0.0f;   // base at ground
+        lamp.position[1] = 0.0f;
         lamp.position[2] = lz;
         lamp.height = ly;
         lamp.aabb = allMeshes.cube.aabb;
@@ -1202,25 +1197,27 @@ void buildScene()
 
         Tree tree;
         tree.position[0] = rx;
-        tree.position[1] = 0.0f;  // base at ground
+        tree.position[1] = 0.0f;
         tree.position[2] = rz;
 
         tree.scale[0] = 1.5f;
         tree.scale[1] = 4.0f;
         tree.scale[2] = 1.5f;
-        tree.aabb = allMeshes.cone.aabb; // local bounding box
+        tree.aabb = allMeshes.cone.aabb;
 
         trees.push_back(tree);
     }
 
-	drone.position[0] = 20.0f;
-	drone.position[1] = 20.0f;
-	drone.position[2] = -20.0f;
+	{ //drone
+		drone.position[0] = 20.0f;
+		drone.position[1] = 20.0f;
+		drone.position[2] = -20.0f;
 
-	drone.direction[0] = 0.0f;
-	drone.direction[1] = 0.0f;
-	drone.direction[2] = -1.0f;
-	drone.aabb = allMeshes.cube.aabb; //cube
+		drone.direction[0] = 0.0f;
+		drone.direction[1] = 0.0f;
+		drone.direction[2] = -1.0f;
+		drone.aabb = allMeshes.cube.aabb; //cube
+	}
 
 	cams[0].camPos[1] = 200.0;
 	cams[0].camPos[0] = 0.0;
@@ -1298,8 +1295,7 @@ int main(int argc, char **argv)
 
 	buildScene();
 
-	if (!renderer.setRenderMeshesShaderProg("shaders/mesh.vert", "shaders/mesh.frag") ||
-		!renderer.setRenderTextShaderProg("shaders/ttf.vert", "shaders/ttf.frag"))
+	if (!renderer.setRenderMeshesShaderProg("shaders/mesh.vert", "shaders/mesh.frag"))
 		return (1);
 
 	//  GLUT main loop
