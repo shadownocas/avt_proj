@@ -650,23 +650,7 @@ void renderSim(void)
 
 	renderer.activateRenderMeshesShaderProg();
 
-	GLint pid = 0;
-	glGetIntegerv(GL_CURRENT_PROGRAM, &pid);
-	if (pid)
-	{
-		GLint locOn = glGetUniformLocation(pid, "uFogOn");
-		GLint locCol = glGetUniformLocation(pid, "uFogColor");
-		GLint locFS = glGetUniformLocation(pid, "uFogStart");
-		GLint locFE = glGetUniformLocation(pid, "uFogEnd");
-		if (locOn >= 0)
-			glUniform1i(locOn, gFogOn ? 1 : 0);
-		if (locCol >= 0)
-			glUniform3f(locCol, gFogColor[0], gFogColor[1], gFogColor[2]);
-		if (locFS >= 0)
-			glUniform1f(locFS, gFogStart);
-		if (locFE >= 0)
-			glUniform1f(locFE, gFogEnd);
-	}
+	renderer.setFog(gFogOn, gFogColor, gFogStart, gFogEnd);
 
 	update();
 
