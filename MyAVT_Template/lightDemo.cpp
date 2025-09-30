@@ -374,24 +374,24 @@ void updateDrone(float dt) {
 	}
 
 	if (spKeys[GLUT_KEY_DOWN]) {
-    float yawRad = mu.DegToRad(drone.rotation[1]);
-    updateDroneMovement(-sinf(yawRad) * 0.1f, -cosf(yawRad) * 0.1f, -0.5f * cosf(yawRad), 0.5f * sinf(yawRad));
-}
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+		updateDroneMovement(-sinf(yawRad) * 0.1f, -cosf(yawRad) * 0.1f, -0.5f * cosf(yawRad), 0.5f * sinf(yawRad));
+	}
 
-if (spKeys[GLUT_KEY_UP]) {
-    float yawRad = mu.DegToRad(drone.rotation[1]);
-    updateDroneMovement(sinf(yawRad) * 0.1f, cosf(yawRad) * 0.1f, 0.5f * cosf(yawRad), -0.5f * sinf(yawRad));
-}
+	if (spKeys[GLUT_KEY_UP]) {
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+		updateDroneMovement(sinf(yawRad) * 0.1f, cosf(yawRad) * 0.1f, 0.5f * cosf(yawRad), -0.5f * sinf(yawRad));
+	}
 
-if (spKeys[GLUT_KEY_LEFT]) {
-    float yawRad = mu.DegToRad(drone.rotation[1]);
-    updateDroneMovement(cosf(yawRad) * 0.1f, -sinf(yawRad) * 0.1f, -0.5f * sinf(yawRad), -0.5f * cosf(yawRad));
-}
+	if (spKeys[GLUT_KEY_LEFT]) {
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+		updateDroneMovement(cosf(yawRad) * 0.1f, -sinf(yawRad) * 0.1f, -0.5f * sinf(yawRad), -0.5f * cosf(yawRad));
+	}
 
-if (spKeys[GLUT_KEY_RIGHT]) {
-    float yawRad = mu.DegToRad(drone.rotation[1]);
-    updateDroneMovement(-cosf(yawRad) * 0.1f, sinf(yawRad) * 0.1f, 0.5f * sinf(yawRad), 0.5f * cosf(yawRad));
-}
+	if (spKeys[GLUT_KEY_RIGHT]) {
+		float yawRad = mu.DegToRad(drone.rotation[1]);
+		updateDroneMovement(-cosf(yawRad) * 0.1f, sinf(yawRad) * 0.1f, 0.5f * sinf(yawRad), 0.5f * cosf(yawRad));
+	}
 
 
 	float mag = sqrtf(drone.direction[0]*drone.direction[0] + drone.direction[2]*drone.direction[2]);
