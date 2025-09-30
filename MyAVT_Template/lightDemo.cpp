@@ -43,72 +43,42 @@ int WinX = 1024, WinY = 768;
 
 unsigned int FrameCount = 0;
 
-// File with the font
-const string fontPathFile = "fonts/arial.ttf";
-
 // Object of class gmu (Graphics Math Utility) to manage math and matrix operations
 gmu mu;
 
 // Object of class renderer to manage the rendering of meshes and ttf-based bitmap text
 Renderer renderer;
 
-// Camera Position
-// Follow-camera mouse offsets (degrees)
+// Follow-camera mouse offsets
 float followYawOffsetDeg = 0.f;
 float followPitchOffsetDeg = 15.f; // slight downward tilt by default
-float minPitchDeg = -10.0f, maxPitchDeg = 85.0f;
-// mouse sensitivity & state
-float MOUSE_SENS_YAW = 0.25f;	// deg per pixel
-float MOUSE_SENS_PITCH = 0.25f; // deg per pixel
-float startYawDeg = 0.f, startPitchDeg = 0.f;
-float startFollowDistance = 20.f;
+
 // Zoom sensitivity (world units per pixel of RMB drag)
-float ZOOM_SENS = 0.05f;
 float zoomCam1 = 200.0f;  // start height for top view
 float zoomCam2 = 60.0f;   // ortho size
 
-float sYawDeg = 0.0f, sPitchDeg = 15.0f, sDist = 15.0f; // init to your defaults
 int prevX = 0, prevY = 0;
 
-// --- Drone flight state (Task 4)
-float yawDeg = 0.0f;   // heading angle (deg)
-float pitchDeg = 0.0f; // nose up/down (+ = back)
-float rollDeg = 0.0f;  // bank left/right (+ = left)
-
-// --- Forward motion (for UP/DOWN arrows)
-float vFwd = 0.0f;				   // forward speed (units/s)
-const float FWD_MAX_SPEED = 16.0f; // cap (tune)
-const float FWD_GAIN = 3.0f;	   // 1/s — ramp rate to target
-const float PITCH_VIS_MAX = 10.0f; // deg of visual nose tilt at full speed
-
-float velX = 0.0f, velY = 0.0f, velZ = 0.0f; // world velocities
-
-// Controls & physics
-const float maxTiltDeg = 25.0f;	  // clamp for pitch/roll
-const float tiltStepDeg = 1.5f;	  // degrees added per frame while arrow held
-const float tiltReturnDeg = 1.0f; // auto-level speed per frame when released
-const float accelGain = 0.02f;	  // horizontal accel per frame from tilt
-const float horizDrag = 0.02f;	  // decay per frame (0..1)
-const float vertAccel = 0.01f;	  // W/S vertical accel per frame
-const float vertDrag = 0.01f;	  // vertical decay per frame
-const float maxHorizSpeed = 0.6f; // clamp XY speed
-const float maxVertSpeed = 0.5f;  // clamp Y speed
-
-// Special (arrow) key states
-bool spKeys[256] = {false}; // GLUT special keys (UP/DOWN/LEFT/RIGHT)
-
+// Key states
+bool spKeys[256] = {false};
 bool keyStates[256] = {false};
+
+enum DroneMode {
+    NORMAL,
+    COLLISION,
+};
 
 struct Drone
 {
-	float position[3] = {20.0f, 20.0f, -20.0f}; // xyz
-	float direction[3] = {0.0f, 0.0f, -1.0f};	// pointing along -Z initially
+	float position[3] = {20.0f, 20.0f, -20.0f};
+	float direction[3] = {0.0f, 0.0f, -1.0f};
 	float rotation[3] = {0.0f, 0.0f, 0.0f};
 	float speed;
 	float yaw;
 	float velRot;
 	AABB aabb;
 	AABB worldAABB;
+	DroneMode mode = NORMAL;
 };
 
 struct FlyingObject
@@ -143,7 +113,7 @@ struct Building
 {
 	float position[3];
 	float width, depth;
-	int row, col; // indices no grid
+	int row, col;
 	AABB aabb;
 	AABB worldAABB;
 };
@@ -154,6 +124,15 @@ struct FloorObject
 	AABB worldAABB;
 } floorObj;
 
+struct Camera
+{
+	float camPos[3] = {0.0f, 0.0f, 0.0f};
+	float camTarget[3] = {0.0f, 0.0f, 0.0f};
+	int type = 0; // 0 and 2:perspective, 1:orthographic
+};
+
+MeshCollection allMeshes;
+
 std::vector<PointLight> pointLights;
 
 std::vector<FlyingObject> flyingObjects;
@@ -162,96 +141,68 @@ std::vector<LampPost> lampPosts;
 
 std::vector<Tree> trees;
 
-enum DroneState {
-    NORMAL,
-    COLLISION_ANIM,
-};
-
-DroneState droneState = NORMAL;
-float collisionAnimTimer = 0.0f;       // milliseconds
-float collisionAnimDuration = 0.5f;  // 0.5 seconds animation
-
-Drone drone;
-float droneSpeed = 0.2f;	  // units per frame
-float followDistance = 15.0f; // camera distance behind drone
-float followHeight = 5.0f;	  // camera height above drone
-float droneRotSpeed = 1.5f;	  // degrees per frame
-
-struct Camera
-{
-	float camPos[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // camera 4 for orbit view of drone
-	float camTarget[3] = {0.0f, 0.0f, 0.0f};
-	int type = 0; // 0:perspective, 1:orthographic
-};
-
-Camera cams[4];
-
-int activeCam = 0;
-
-bool lampsOn = true; // all lamps initially on
-
 std::vector<Lamp> lampPositions;
 
-MeshCollection allMeshes;
+std::vector<Building> buildings;
+
+Drone drone;
+float followDistance = 15.0f;
+float startFollowDistance = 20.f;
+float followHeight = 5.0f;
+
+float animationCollision = 0.0f;
+float animationCollisionDuration = 0.5f;
+
+Camera cams[4];
+int activeCam = 0;
 
 // Mouse Tracking Variables
 int startX, startY, tracking = 0;
 
 // Camera Spherical Coordinates
-float alpha = 57.0f, beta = 18.0f;
-float r = 45.0f;
+float alpha = 57.0f;
 
-// Frame counting and FPS computation
-long myTime, timebase = 0, frame = 0;
+bool lampsOn = true;
+
 char s[32];
 
-bool dayMode = true;						  // Day/night toggle
-float dirLightDir[3] = {-0.5f, -1.0f, -0.3f}; // Direction of sunlight
-float dirLightColor[3] = {1.0f, 1.0f, 0.9f};  // Day color
-// float nightLightColor[3] = { 0.1f, 0.1f, 0.2f }; // Night ambient color
+// Ambient light
+bool dayMode = true;
+float dirLightColor[3] = {1.0f, 1.0f, 0.9f};
 float nightLightColor[3] = {0.0f, 0.0f, 0.0f};
-
-float lightPos[4] = {4.0f, 20.0f, 2.0f, 1.0f};
-// float lightPos[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 // Spotlight
 bool spotlight_mode = false;
-float coneDir[4] = {0.0f, -0.0f, -1.0f, 0.0f};
-
 SpotLight droneHeadlights[2]; // two headlights
 
+// City
 int rows = 7; // number of rows
 int cols = 7; // number of columns
 float gap = 20.0f;
-float offsetX = -((cols - 1) * (10.0f + gap)) / 2.0f; // center grid 10 = buildingWidth
-float offsetZ = -((rows - 1) * (10.0f + gap)) / 2.0f; // 10 = buildingDepth
-
-int numLamps = std::min(rows, cols);
-float lampHeight = 10.0f;
-float lampOffset = (10.0f + gap) / 2.0f + 2.0f; // push them to the side of diagonal 10 = buildingWidth
-
-bool fontLoaded = false;
-bool flyingColision = false;
-
-std::vector<Building> buildings;
+float offsetX = -((cols - 1) * (10.0f + gap)) / 2.0f;
+float offsetZ = -((rows - 1) * (10.0f + gap)) / 2.0f;
 std::vector<std::vector<float>> buildingHeights(rows, std::vector<float>(cols));
+
+float lampHeight = 10.0f;
 
 float buildingW = 10.0f;
 float buildingD = 10.0f;
-float streetWidth = 30.0f; // largura da rua
-float sidewalk = 2.0f;	   // passeios
+float streetWidth = 30.0f;
+float sidewalk = 2.0f;
 
-// central garden define: ocupa N x M células no centro
-int gardenSizeRows = 3; // 2x2 cells
+int gardenSizeRows = 3;
 int gardenSizeCols = 3;
 
 float gardenHalfW = (gardenSizeCols * (buildingW + gap) - gap) / 2.0f;
 float gardenHalfD = (gardenSizeRows * (buildingD + gap) - gap) / 2.0f;
 
-float gardenCenterX = 6.0f; // because grid centered with offsetX/offsetZ
+float gardenCenterX = 6.0f;
 float gardenCenterZ = 5.0f;
 float gardenW = gardenHalfW * 2.0f;
 float gardenD = gardenHalfD * 2.0f;
+
+// Collision
+bool flyingColision = false;
 
 
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
@@ -267,7 +218,7 @@ void timer(int value)
 	glutTimerFunc(1000, timer, 0);
 }
 
-void refresh(int value) // faz RENDER
+void refresh(int value)
 {
 	glutPostRedisplay();
 	glutTimerFunc(1000 / 60, refresh, 0);
@@ -281,15 +232,13 @@ void refresh(int value) // faz RENDER
 void changeSize(int w, int h)
 {
 	float ratio;
-	// Prevent a divide by zero, when window is too short
 	if (h == 0)
 		h = 1;
 
 	WinX = w;
 	WinY = h;
-	// set the viewport to be the entire window
-	glViewport(0, 0, w, h);
-	// set the projection matrix
+
+	glViewport(0, 0, w, h); //viewport is whole window
 	ratio = (1.0f * w) / h;
 	int m_viewport[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
@@ -306,8 +255,8 @@ void changeSize(int w, int h)
 }
 
 AABB updateGlobalAABB(AABB result, float* modelMatrix) {
-    float globalMin[3] = { 100000000000, 100000000000, 100000000000 };
-    float globalMax[3] = { -100000000000, -100000000000, -100000000000 };
+    float globalMin[3] = { 99999999999, 99999999999, 99999999999 };
+    float globalMax[3] = { -99999999999, -99999999999, -99999999999 };
 	AABB obj = result; 
     for (int i = 0; i < 8; i++) {
         float* c = obj.corners[i];
@@ -327,15 +276,15 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
         obj.corners[i][1] = y;
         obj.corners[i][2] = z;
 
+		// Update global max
+        globalMax[0] = std::max(globalMax[0], x);
+        globalMax[1] = std::max(globalMax[1], y);
+        globalMax[2] = std::max(globalMax[2], z);
+
         // Update global min
         globalMin[0] = std::min(globalMin[0], x);
         globalMin[1] = std::min(globalMin[1], y);
         globalMin[2] = std::min(globalMin[2], z);
-
-        // Update global max
-        globalMax[0] = std::max(globalMax[0], x);
-        globalMax[1] = std::max(globalMax[1], y);
-        globalMax[2] = std::max(globalMax[2], z);
     }
 
     obj.aabbmin[0] = globalMin[0];
@@ -353,12 +302,6 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
 //
 // Render stufff
 //
-
-inline float clampf(float v, float lo, float hi)
-{
-	return (v < lo) ? lo : (v > hi) ? hi
-									: v;
-}
 
 void rotateDrone(float x, float y, float z, float dt) {
 	drone.rotation[0] += x * dt;
@@ -594,6 +537,44 @@ void updateFlyingObjects(float dt){
 	}
 }
 
+bool collision(){
+	bool collisionDetected = false;
+	for (Building &b : buildings) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
+			printf("COLLISION with BUILDING object!");
+			collisionDetected = true;
+		}
+	}
+
+	for (FlyingObject &obj : flyingObjects) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+			printf("COLLISION with FLYING object!");
+			collisionDetected = true;
+			flyingColision = true;
+		}
+	}
+
+	for (LampPost &obj : lampPosts) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+			printf("COLLISION with LAMPPOST object!");
+			collisionDetected = true;
+		}
+	}
+
+	for (Tree &obj : trees) {
+		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
+			printf("COLLISION with TREE object!");
+			collisionDetected = true;
+		}
+	}
+
+	if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, floorObj.worldAABB.aabbmin, floorObj.worldAABB.aabbmax)) {
+		printf("COLLISION with FLOOR object!");
+		collisionDetected = true;
+	}
+	return collisionDetected;
+}
+
 void update(){
 	static int prevMs = -1;
 	int nowMs = glutGet(GLUT_ELAPSED_TIME);
@@ -601,60 +582,21 @@ void update(){
 		prevMs = nowMs;
 	float dt = (nowMs - prevMs) / 1000.0f;
 	prevMs = nowMs;
-	if (dt < 0.001f)
-		dt = 0.001f;
-	if (dt > 0.033f)
-		dt = 0.033f;
+	
 	static bool collisionPushedBack = false;
-
-	if (droneState == NORMAL) {
-		bool collisionDetected = false;
-		for (Building &b : buildings) {
-			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
-				printf("COLLISION with BUILDING object!");
-				collisionDetected = true;
-			}
-		}
-
-		for (FlyingObject &obj : flyingObjects) {
-			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
-				printf("COLLISION with FLYING object!");
-				collisionDetected = true;
-				flyingColision = true;
-			}
-		}
-
-		for (LampPost &obj : lampPosts) {
-			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
-				printf("COLLISION with LAMPPOST object!");
-				collisionDetected = true;
-			}
-		}
-
-		for (Tree &obj : trees) {
-			if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, obj.worldAABB.aabbmin, obj.worldAABB.aabbmax)) {
-				printf("COLLISION with TREE object!");
-				collisionDetected = true;
-			}
-		}
-
-		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, floorObj.worldAABB.aabbmin, floorObj.worldAABB.aabbmax)) {
-			printf("COLLISION with FLOOR object!");
-			collisionDetected = true;
-		}
-
-		if (collisionDetected) {
-			droneState = COLLISION_ANIM;
-			collisionPushedBack = false;  // reset for this collision
-			collisionAnimTimer = 0.0f;
+	if (drone.mode == NORMAL) {
+		if (collision()) {
+			drone.mode = COLLISION;
+			collisionPushedBack = false; // Reset
+			animationCollision = 0.0f;
 		} else {
-			updateDrone(dt);  // normal movement
+			updateDrone(dt); // Normal movement
 		}
 	}
-	else if (droneState == COLLISION_ANIM) {
+	else if (drone.mode == COLLISION) {
 
 		if (flyingColision == true) {
-			// Reset to initial position
+			// Reset to initial pos
 			drone.position[0] = 20.0f;
 			drone.position[1] = 20.0f;
 			drone.position[2] = -20.0f;
@@ -663,11 +605,11 @@ void update(){
 			drone.direction[1] = 0.0f;
 			drone.direction[2] = 0.0f;
 			flyingColision = false;
-			droneState = NORMAL;
+			drone.mode = NORMAL;
 		} 
-		else{// Push back once
+		else{
 			if (!collisionPushedBack) {
-				float pushBackDistance = 3.0f; 
+				float pushBackDistance = 1.0f; 
 				
 				drone.position[0] -= drone.direction[0] * pushBackDistance;
 				drone.position[1] -= drone.direction[1] * pushBackDistance;
@@ -681,9 +623,9 @@ void update(){
 				collisionPushedBack = true;
 			}
 
-			collisionAnimTimer += dt;
-			if (collisionAnimTimer >= collisionAnimDuration) { 
-				droneState = NORMAL;
+			animationCollision += dt;
+			if (animationCollision >= animationCollisionDuration) { 
+				drone.mode = NORMAL;
 			}
 		}
     }
@@ -714,11 +656,9 @@ void renderSim(void)
 	renderer.setTexUnit(5, 5);
 	renderer.setTexUnit(6, 6);
 
-	// --- Set camera/view ---
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::MODEL);
 
-	// set the camera
 	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
 			  cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0, 1, 0);
 
@@ -733,17 +673,15 @@ void renderSim(void)
 
 	dataMesh data;
 
-	// --- Headlight offsets in LOCAL space of the cube ---
+	//Headlight offsets
 	float localHeadlightOffsets[2][4] = {
 		{-0.5f, 0.0f, 1.0f, 1.0f}, // left headlight
 		{0.5f, 0.0f, 1.0f, 1.0f}   // right headlight
 	};
 
-	// Compute drone's rotation matrix
-	float angle_Y = atan2(drone.direction[0], -drone.direction[2]);
 	mu.pushMatrix(gmu::MODEL);
 	mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
-	mu.rotate(gmu::MODEL, angle_Y * 180.0f / 3.14159f, 0.0f, 1.0f, 0.0f);
+	mu.rotate(gmu::MODEL, drone.rotation[1], 0.0f, 1.0f, 0.0f);
 
 	// For each headlight
 	for (int i = 0; i < 2; i++)
@@ -794,7 +732,7 @@ void renderSim(void)
 		mu.computeNormalMatrix3x3();
 
 		float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(obj.aabb, modelMatrix); //WORLD SPACEE
+		AABB aabbBox = updateGlobalAABB(obj.aabb, modelMatrix);
 		obj.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
@@ -816,11 +754,11 @@ void renderSim(void)
 		mu.computeNormalMatrix3x3();
 
 		float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(floorObj.aabb, modelMatrix); //WORLD SPACEE
+		AABB aabbBox = updateGlobalAABB(floorObj.aabb, modelMatrix);
 		floorObj.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.quad;
-		data.texMode = 10; //multiple texturing
+		data.texMode = 10; // Multiple texturing
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -851,7 +789,7 @@ void renderSim(void)
 		mu.computeNormalMatrix3x3();
 
 		float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix); //WORLD SPACEE
+		AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix);
 		drone.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
@@ -920,11 +858,10 @@ void renderSim(void)
         mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
         mu.computeNormalMatrix3x3();
 
-       float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(tree.aabb, modelMatrix); //WORLD SPACEE
+        float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(tree.aabb, modelMatrix);
 		tree.worldAABB = aabbBox;
 
-        // --- Render mesh ---
         data.mesh = &allMeshes.cone;
         data.texMode = 5;
         data.vm = mu.get(gmu::VIEW_MODEL);
@@ -945,9 +882,8 @@ void renderSim(void)
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 
-		 // Compute world-space AABB
 		float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(b.aabb, modelMatrix); //WORLD SPACEE
+		AABB aabbBox = updateGlobalAABB(b.aabb, modelMatrix);
 		b.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
@@ -962,7 +898,7 @@ void renderSim(void)
 
 	pointLights.clear();
 
-	// --------- Draw lamp post ----------
+	// --- Draw lamp post ---
 	for (LampPost &lamp : lampPosts) {
         float lx = lamp.position[0];
         float ly = lamp.height;
@@ -991,11 +927,11 @@ void renderSim(void)
         mu.computeNormalMatrix3x3();
 
         float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(lamp.aabb, modelMatrix); //WORLD SPACEE
+		AABB aabbBox = updateGlobalAABB(lamp.aabb, modelMatrix);
 		lamp.worldAABB = aabbBox;
 
         data.mesh = &allMeshes.cube;
-        data.texMode = 4; // metal
+        data.texMode = 4;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1004,7 +940,7 @@ void renderSim(void)
     }
 	renderer.setLampLights(pointLights, lampsOn);
 
-	// --------- Draw bulb ----------
+	// --- Draw bulb ---
 	glDepthMask(GL_FALSE);
 	for (LampPost &lamp : lampPosts) {
         mu.pushMatrix(gmu::MODEL);
@@ -1014,7 +950,7 @@ void renderSim(void)
         mu.computeNormalMatrix3x3();
 
         data.mesh = &allMeshes.sphere;
-        data.texMode = 2;
+        data.texMode = 2; // Transparency
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1047,17 +983,9 @@ void processKeys(unsigned char key, int xx, int yy)
 		glutLeaveMainLoop();
 		break;
 
-	case 'h': // toggle spotlight mode
-		if (!spotlight_mode)
-		{
-			spotlight_mode = true;
-			printf("Spot light disabled\n");
-		}
-		else
-		{
-			spotlight_mode = false;
-			printf("Spot light disabled. Point light enabled\n");
-		}
+	case 'h':
+		spotlight_mode = !spotlight_mode;
+		printf("Spot light %s\n", spotlight_mode ? "ON" : "OFF");
 		break;
 
 	case 'c': // toggle lamp posts
@@ -1065,12 +993,9 @@ void processKeys(unsigned char key, int xx, int yy)
 		printf("Lamp posts %s\n", lampsOn ? "ON" : "OFF");
 		break;
 
-	case 'n': // toggle day/night mode
+	case 'n':
 		dayMode = !dayMode;
-		if (dayMode)
-			printf("Day mode ON\n");
-		else
-			printf("Night mode ON\n");
+		printf("Ambient Light %s\n", spotlight_mode ? "ON" : "OFF");
 		break;
 
 	case 'm':
@@ -1092,6 +1017,15 @@ void processKeys(unsigned char key, int xx, int yy)
 		activeCam = 3;
 		break;
 	}
+}
+
+void processSpecialDown(int key, int x, int y)
+{
+	spKeys[key] = true;
+}
+void processSpecialUp(int key, int x, int y)
+{
+	spKeys[key] = false;
 }
 
 // ------------------------------------------------------------
@@ -1122,13 +1056,12 @@ void processMouseButtons(int button, int state, int xx, int yy)
 	}
 }
 
-// Track mouse motion while buttons are pressed
 void processMouseMotion(int xx, int yy) {
     int deltaX = xx - startX;
     int deltaY = yy - startY;
 
-    if (tracking == 1) { // left mouse button: rotate camera
-        followYawOffsetDeg   += deltaX * 0.3f;  // scale to taste
+    if (tracking == 1) { // rotate camera
+        followYawOffsetDeg   += deltaX * 0.3f;
         followPitchOffsetDeg += deltaY * 0.3f;
 
         if (followPitchOffsetDeg > 85.0f) followPitchOffsetDeg = 85.0f;
@@ -1137,8 +1070,8 @@ void processMouseMotion(int xx, int yy) {
         startX = xx; // update last mouse pos
         startY = yy;
     }
-    else if (tracking == 2) { // right mouse button: zoom
-		if (activeCam == 2) { // drone follow cam
+    else if (tracking == 2) { // zoom
+		if (activeCam == 2) {
 			followDistance += deltaY * 0.1f;
 			if (followDistance < 1.0f) followDistance = 1.0f;
 		}
@@ -1158,8 +1091,6 @@ void processMouseMotion(int xx, int yy) {
 
 void mouseWheel(int wheel, int direction, int x, int y)
 {
-
-	// direction is +1 (scroll up) or -1 (scroll down)
     float delta = (float)direction;
 
     if (activeCam == 2) { // drone follow cam
@@ -1175,15 +1106,6 @@ void mouseWheel(int wheel, int direction, int x, int y)
         if (zoomCam2 < 5.0f) zoomCam2 = 5.0f;
     }
 	
-}
-
-void processSpecialDown(int key, int x, int y)
-{
-	spKeys[key] = true;
-}
-void processSpecialUp(int key, int x, int y)
-{
-	spKeys[key] = false;
 }
 
 //
@@ -1202,7 +1124,6 @@ void buildScene()
 	renderer.TexObjArray.texture2D_Loader("assets/road.tga");
 
 	// Scene geometry with triangle meshes
-
 	MyMesh amesh;
 
 	float amb[] = {0.2f, 0.15f, 0.1f, 1.0f};
@@ -1213,7 +1134,7 @@ void buildScene()
 	float diff1[] = {0.8f, 0.1f, 0.1f, 1.0f};
 	float spec1[] = {0.3f, 0.3f, 0.3f, 1.0f};
 
-	float ambBulb[] = {0.2f, 0.2f, 0.0f, 0.3f};	 // alpha = 0.3
+	float ambBulb[] = {0.2f, 0.2f, 0.0f, 0.3f};
 	float diffBulb[] = {0.8f, 0.8f, 0.2f, 0.3f};
 	float specBulb[] = {0.5f, 0.5f, 0.3f, 0.3f};
 	float emisBulb[] = {1.0f, 1.0f, 0.2f, 0.3f};
@@ -1222,7 +1143,6 @@ void buildScene()
 	float diffMotor[] = {0.05f, 0.05f, 0.05f, 1.0f};
 	float specMotor[] = {0.2f, 0.2f, 0.2f, 1.0f};
 	float emisMotor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-
 
 	float emissive[] = {0.0f, 0.0f, 0.0f, 1.0f};
 	float shininess = 100.0f;
@@ -1274,7 +1194,7 @@ void buildScene()
 	allMeshes.torus.mat.texCount = texcount;
 
 
-	// ----- INITIALIZE FLYING OBJECTS -----
+	// --- INITIALIZE FLYING OBJECTS ---
 	for (int i = 0; i < 10; i++)
 	{
 		FlyingObject obj;
@@ -1291,12 +1211,13 @@ void buildScene()
 		obj.speed = 4.0f;
 		obj.rotationAngle = 0.0f;
 		obj.rotationSpeed = 1.0f + (rand() % 5);
-		obj.meshID = 2 + (i % 2);				 // 2 = sphere, 3 = cone
+		obj.meshID = 2 + (i % 2);
 		obj.active = true;
 		obj.aabb = allMeshes.cube.aabb;
 		flyingObjects.push_back(obj);
 	}
 
+	// --- INITIALIZE BUILDINGS ---
 	buildings.clear();
 	for (int r = 0; r < rows; ++r)
 	{
@@ -1343,6 +1264,7 @@ void buildScene()
 		}
 	}
 
+	// --- INITIALIZE LAMP POSTS ---
 	float lampRadius = std::max(gardenW, gardenD) / 2.0f; 
 	int lampCount = LAMP_POST_NUMBER;
     for (int i = 0; i < lampCount; ++i) {
@@ -1361,6 +1283,7 @@ void buildScene()
         lampPosts.push_back(lamp);
     }
 
+	// --- INITIALIZE TREES ---
 	for (int t = 0; t < 6; ++t) {
         float ang = (2.0f * 3.14159f) * t / 6.0f;
         float rx = gardenCenterX + (gardenW / 2.2f - 4.0f) * cos(ang);
@@ -1379,7 +1302,8 @@ void buildScene()
         trees.push_back(tree);
     }
 
-	{ //drone
+	// --- INITIALIZE DRONE ---
+	{
 		drone.position[0] = 20.0f;
 		drone.position[1] = 20.0f;
 		drone.position[2] = -20.0f;
@@ -1387,7 +1311,7 @@ void buildScene()
 		drone.direction[0] = 0.0f;
 		drone.direction[1] = 0.0f;
 		drone.direction[2] = -1.0f;
-		drone.aabb = allMeshes.cube.aabb; //cube
+		drone.aabb = allMeshes.cube.aabb;
 	}
 
 	floorObj.aabb = allMeshes.quad.aabb;
@@ -1426,7 +1350,7 @@ int main(int argc, char **argv)
 	glutReshapeFunc(changeSize);
 
 	glutTimerFunc(0, timer, 0);
-	glutTimerFunc(0, refresh, 0);    //use it to to get 60 FPS whatever
+	glutTimerFunc(0, refresh, 0);
 
 	//	Mouse and Keyboard Callbacks
 	glutKeyboardFunc(processKeys);
