@@ -353,6 +353,7 @@ void updateDrone(float dt) {
 		drone.direction[1] = 0.0f;
 		drone.direction[2] = 0.0f;
 	}
+
 	if (keyStates['w']) {
 		if (drone.speed < 4.0f) drone.speed += MAX_VSPEED;
 		if (drone.direction[1] < 1.0f) drone.direction[1] += MAX_VSPEED;
@@ -484,7 +485,9 @@ void updateFlyingObjects(float dt){
 		obj.position[1] += obj.direction[1] * obj.speed * dt;
 		obj.position[2] += obj.direction[2] * obj.speed * dt;
 
-		obj.speed *= 1.001f;
+		obj.speed *= 1.00001f;
+		obj.rotationAngle += 40.0f * obj.rotationSpeed * dt;
+        if (obj.rotationAngle > 360.0f) obj.rotationAngle -= 360.0f;
 
 		// Respawn if out of visible region
 		if (fabs(obj.position[0]) > 150 || fabs(obj.position[2]) > 150)
@@ -694,8 +697,8 @@ void renderSim(void)
 	{
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, obj.position[0], obj.position[1], obj.position[2]);
-		mu.scale(gmu::MODEL, 5.0f, 5.0f, 5.0f);
 		mu.rotate(gmu::MODEL, obj.rotationAngle, 0.0f, 1.0f, 0.0f);
+		mu.scale(gmu::MODEL, 5.0f, 5.0f, 5.0f);
 
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
@@ -1185,7 +1188,7 @@ void buildScene()
 
 		obj.speed = 4.0f;
 		obj.rotationAngle = 0.0f;
-		obj.rotationSpeed = 1.0f + (rand() % 5);
+		obj.rotationSpeed = 0.01f + (rand() % 5);
 		obj.meshID = 2 + (i % 2);
 		obj.active = true;
 		obj.aabb = allMeshes.cube.aabb;

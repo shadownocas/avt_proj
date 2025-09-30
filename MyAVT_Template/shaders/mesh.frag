@@ -74,31 +74,31 @@ uniform int texMode;
 out vec4 colorOut;
 
 // --- Phong for one light ---
-vec3 calcPhong(vec3 N, vec3 V, vec3 L, vec3 lightColor) {
-    float diff = max(dot(N, L), 0.0);
-    vec3 H = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), mat.shininess);
+vec3 calcPhong(vec3 Normal, vec3 View, vec3 LightDir, vec3 lightColor) {
+    float diff = max(dot(Normal, LightDir), 0.0);
+    vec3 HalfVec = normalize(LightDir + View);
+    float spec = pow(max(dot(Normal, HalfVec), 0.0), mat.shininess);
     return diff * mat.diffuse.rgb * lightColor + spec * mat.specular.rgb * lightColor;
 }
 
-// --- Compute point light with attenuation ---
-vec3 calcPointLight(PointLight light, vec3 N, vec3 V, vec3 posEye) {
+// --- Point light with attenuation ---
+vec3 calcPointLight(PointLight light, vec3 Normal, vec3 View, vec3 posEye) {
     vec3 toLight = light.LocalPos - posEye;
     float dist = length(toLight);
-    vec3 L = normalize(toLight);
+    vec3 LightDir = normalize(toLight);
 
     float att = 1.0 / (light.atten.constant + light.atten.linear * dist + light.atten.exp * dist * dist);
 
-    return calcPhong(N, V, L, light.Color) * att;
+    return calcPhong(Normal, View, LightDir, light.Color) * att;
 }
 
-vec3 calcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 posEye) {
+vec3 calcSpotLight(SpotLight light, vec3 Normal, vec3 View, vec3 posEye) {
     vec3 toLight = light.Position - posEye;
     float dist = length(toLight);
-    vec3 L = normalize(toLight);
+    vec3 LightDir = normalize(toLight);
 
     // Spotlight factor: angle between light direction and vector to fragment
-    float spotFactor = dot(-L, normalize(light.Direction));
+    float spotFactor = dot(-LightDir, normalize(light.Direction));
     if (spotFactor < light.Cutoff) {
         return vec3(0.0); // outside spotlight cone
     }
@@ -107,7 +107,7 @@ vec3 calcSpotLight(SpotLight light, vec3 N, vec3 V, vec3 posEye) {
     float att = 1.0 / (light.atten.constant + light.atten.linear * dist + light.atten.exp * dist * dist);
 
     // Phong contribution
-    return calcPhong(N, V, L, light.Color) * att * spotFactor; // multiply by spotFactor for smooth edge
+    return calcPhong(Normal, View, LightDir, light.Color) * att * spotFactor; // multiply by spotFactor for smooth edge
 }
 
 
