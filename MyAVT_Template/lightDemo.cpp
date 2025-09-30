@@ -319,6 +319,30 @@ void moveDrone(float dt) {
 	drone.position[2] += drone.direction[2] * drone.speed * dt;
 }
 
+void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZAdd) {
+    if (drone.speed < 12.0f) drone.speed += 2.0f;
+
+    // Vertical movement
+    drone.direction[1] -= 0.005f;
+    float yawRad = mu.DegToRad(drone.rotation[1]);
+
+    drone.direction[0] += dirXAdd;
+    drone.direction[2] += dirZAdd;
+
+    // Rotation tilt
+    float rotX = drone.rotation[0] + rotXAdd;
+    float rotZ = drone.rotation[2] + rotZAdd;
+    float tiltMag = sqrtf(rotX * rotX + rotZ * rotZ);
+    if (tiltMag > 20.0f) {
+        float scale = 20.0f / tiltMag;
+        rotX *= scale;
+        rotZ *= scale;
+    }
+    drone.rotation[0] = rotX;
+    drone.rotation[2] = rotZ;
+}
+
+
 void updateDrone(float dt) {
 	const float MAX_VSPEED = 1.0f;
 
@@ -350,79 +374,25 @@ void updateDrone(float dt) {
 	}
 
 	if (spKeys[GLUT_KEY_DOWN]) {
-		if (drone.speed < 12.0f) drone.speed += 2.0f;
-		drone.direction[1] -= 0.005f;
-		float yawRad = mu.DegToRad(drone.rotation[1]);
+    float yawRad = mu.DegToRad(drone.rotation[1]);
+    updateDroneMovement(-sinf(yawRad) * 0.1f, -cosf(yawRad) * 0.1f, -0.5f * cosf(yawRad), 0.5f * sinf(yawRad));
+}
 
-		drone.direction[0] += -sinf(yawRad) * 0.1f;
-		drone.direction[2] += -cosf(yawRad) * 0.1f;
-		
-		float rotX = drone.rotation[0] + 0.5f * -cosf(yawRad);
-		float rotZ = drone.rotation[2] + 0.5f * sinf(yawRad);
-		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
-		if (tiltMag > 20.0f) {
-			rotX *= 20.0f / tiltMag;
-			rotZ *= 20.0f / tiltMag;
-		}
-		drone.rotation[0] = rotX;
-		drone.rotation[2] = rotZ;
-	}
+if (spKeys[GLUT_KEY_UP]) {
+    float yawRad = mu.DegToRad(drone.rotation[1]);
+    updateDroneMovement(sinf(yawRad) * 0.1f, cosf(yawRad) * 0.1f, 0.5f * cosf(yawRad), -0.5f * sinf(yawRad));
+}
 
-	if (spKeys[GLUT_KEY_UP]) {
-		if (drone.speed < 12.0f) drone.speed += 2.0f;
-		drone.direction[1] -= 0.005f;
-		float yawRad = mu.DegToRad(drone.rotation[1]);
-		drone.direction[0] += sinf(yawRad) * 0.1f;
-		drone.direction[2] += cosf(yawRad) * 0.1f;
+if (spKeys[GLUT_KEY_LEFT]) {
+    float yawRad = mu.DegToRad(drone.rotation[1]);
+    updateDroneMovement(cosf(yawRad) * 0.1f, -sinf(yawRad) * 0.1f, -0.5f * sinf(yawRad), -0.5f * cosf(yawRad));
+}
 
-		float rotX = drone.rotation[0] + 0.5f * cosf(yawRad);
-		float rotZ = drone.rotation[2] + 0.5f * -sinf(yawRad);
-		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
-		if (tiltMag > 20.0f) {
-			rotX *= 20.0f / tiltMag;
-			rotZ *= 20.0f / tiltMag;
-		}
-		drone.rotation[0] = rotX;
-		drone.rotation[2] = rotZ;
-	}
+if (spKeys[GLUT_KEY_RIGHT]) {
+    float yawRad = mu.DegToRad(drone.rotation[1]);
+    updateDroneMovement(-cosf(yawRad) * 0.1f, sinf(yawRad) * 0.1f, 0.5f * sinf(yawRad), 0.5f * cosf(yawRad));
+}
 
-	if (spKeys[GLUT_KEY_LEFT]) {
-		if (drone.speed < 12.0f) drone.speed += 2.0f;
-		drone.direction[1] -= 0.005f;
-		float yawRad = mu.DegToRad(drone.rotation[1]);
-
-		drone.direction[0] += cosf(yawRad) * 0.1f;
-		drone.direction[2] += -sinf(yawRad) * 0.1f;
-
-		float rotX = drone.rotation[0] + 0.5f * -sinf(yawRad);
-		float rotZ = drone.rotation[2] + 0.5f * -cosf(yawRad);
-		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
-		if (tiltMag > 20.0f) {
-			rotX *= 20.0f / tiltMag;
-			rotZ *= 20.0f / tiltMag;
-		}
-		drone.rotation[0] = rotX;
-		drone.rotation[2] = rotZ;
-	}
-
-	if (spKeys[GLUT_KEY_RIGHT]) {
-		if (drone.speed < 12.0f) drone.speed += 2.0f;
-		drone.direction[1] -= 0.005f;
-		float yawRad = mu.DegToRad(drone.rotation[1]);
-
-		drone.direction[0] += -cosf(yawRad) * 0.1f;
-		drone.direction[2] += sinf(yawRad) * 0.1f;
-
-		float rotX = drone.rotation[0] + 0.5f * sinf(yawRad);
-		float rotZ = drone.rotation[2] + 0.5f * cosf(yawRad);
-		float tiltMag = sqrtf(rotX*rotX + rotZ*rotZ);
-		if (tiltMag > 20.0f) {
-			rotX *= 20.0f / tiltMag;
-			rotZ *= 20.0f / tiltMag;
-		}
-		drone.rotation[0] = rotX;
-		drone.rotation[2] = rotZ;
-	}
 
 	float mag = sqrtf(drone.direction[0]*drone.direction[0] + drone.direction[2]*drone.direction[2]);
 	if (mag > 1.0f) {
@@ -430,30 +400,23 @@ void updateDrone(float dt) {
 		drone.direction[2] /= mag;
 	}
 
-	if (!spKeys[GLUT_KEY_UP] && !spKeys[GLUT_KEY_DOWN] && 
-	!spKeys[GLUT_KEY_LEFT] && !spKeys[GLUT_KEY_RIGHT]) {
-		float tiltX = drone.rotation[0];
-		float tiltZ = drone.rotation[2];
-		float tiltMag = sqrtf(tiltX*tiltX + tiltZ*tiltZ);
-
-		if (tiltMag > 0.0f) {
-			float recoverySpeed = 0.5f; // degrees per frame
-			float scale = (tiltMag - recoverySpeed) / tiltMag;
-			if (scale < 0.0f) scale = 0.0f;
-
-			drone.rotation[0] *= scale;
-			drone.rotation[2] *= scale;
+	auto recoverComponent = [](float& x, float& z, float recoverySpeed) {
+		float mag = sqrtf(x*x + z*z);
+		if (mag > 0.0f) {
+			float scale = (mag - recoverySpeed) / mag;
+			scale = std::max(scale, 0.0f);
+			x *= scale;
+			z *= scale;
 		}
-		if (drone.direction[0] != 0.0f || drone.direction[2] != 0.0f) {
-			float dirMag = sqrtf(drone.direction[0]*drone.direction[0] + drone.direction[2]*drone.direction[2]);
-			if (dirMag > 0.0f) {
-				float recoverySpeed = 0.01f; // units per frame
-				float scale = (dirMag - recoverySpeed) / dirMag;
-				if (scale < 0.0f) scale = 0.0f;
+	};
 
-				drone.direction[0] *= scale;
-				drone.direction[2] *= scale;
-			}
+	if (!( spKeys[GLUT_KEY_LEFT] || spKeys[GLUT_KEY_RIGHT] || spKeys[GLUT_KEY_UP] || spKeys[GLUT_KEY_DOWN])) {
+		// Recover rotation
+		recoverComponent(drone.rotation[0], drone.rotation[2], 0.5f);
+
+		// Recover direction
+		if (drone.direction[0] != 0.0f || drone.direction[2] != 0.0f) {
+			recoverComponent(drone.direction[0], drone.direction[2], 0.01f);
 		}
 	}
 
