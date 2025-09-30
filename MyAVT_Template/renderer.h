@@ -93,6 +93,8 @@ public:
 
   void setDroneSpotLights(SpotLight* lights, int count, bool enabled);
 
+  void setFog(bool on, const float color[3], float start, float end);
+
   //Vector with meshes
   std::vector<struct MyMesh> myMeshes;
 

@@ -62,6 +62,13 @@ uniform bool lampsOn;
 uniform bool spotlightsOn;
 uniform SpotLight spotLights[2];
 
+// Fog
+uniform int   uFogOn;
+uniform vec3  uFogColor;
+uniform float uFogDensity;
+uniform float uFogStart;
+uniform float uFogEnd;
+
 uniform int texMode;
 
 out vec4 colorOut;
@@ -183,5 +190,13 @@ void main() {
         }
         vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb * texel1.rgb);
         colorOut = vec4(finalColor, 1.0);
+    }
+    
+    // Fog
+    if (uFogOn == 1) {
+        float dist = length(DataIn.posEye);
+        float f = (uFogEnd - dist) / (uFogEnd - uFogStart);
+        f = clamp(f, 0.0, 1.0);                         // 0=fog, 1=scene
+        colorOut.rgb = mix(uFogColor, colorOut.rgb, f); // linear blend
     }
 }

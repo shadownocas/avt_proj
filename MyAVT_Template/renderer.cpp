@@ -159,12 +159,29 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
 
     return(shader.isProgramLinked() && shader.isProgramValid());
 }
+
+
+void Renderer::setFog(bool on, const float color[3], float start, float end) {
+    GLint pid = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &pid);
+    if (!pid) return;
+
+    GLint locOn  = glGetUniformLocation(pid, "uFogOn");
+    GLint locCol = glGetUniformLocation(pid, "uFogColor");
+    GLint locFS  = glGetUniformLocation(pid, "uFogStart");
+    GLint locFE  = glGetUniformLocation(pid, "uFogEnd");
+
+    if (locOn >= 0)  glUniform1i(locOn, on ? 1 : 0);
+    if (locCol >= 0) glUniform3f(locCol, color[0], color[1], color[2]);
+    if (locFS >= 0)  glUniform1f(locFS, start);
+    if (locFE >= 0)  glUniform1f(locFE, end);
+}
+
 Renderer::~Renderer() {
     glDeleteProgram(program);
     glDeleteProgram(textProgram);
     for (auto& mesh : myMeshes) glDeleteVertexArrays(1, &(mesh.vao));
     myMeshes.clear(); myMeshes.shrink_to_fit();
- 
 }
 
 bool Renderer::setRenderTextShaderProg(const std::string& vertShaderPath, const std::string& fragShaderPath) {

@@ -32,7 +32,6 @@
 #include "model.h"
 #include "texture.h"
 #include <cmath>	 // sinf, cosf, atan2f
-#include <algorithm> // if you use std::clamp elsewhere
 
 using namespace std;
 
@@ -204,6 +203,11 @@ float gardenD = gardenHalfD * 2.0f;
 // Collision
 bool flyingColision = false;
 
+// Fog
+bool gFogOn = false;
+float gFogStart = 60.0f;
+float gFogEnd = 180.0f;
+float gFogColor[3] = {0.65f, 0.72f, 0.80f};
 
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
 
@@ -646,6 +650,24 @@ void renderSim(void)
 
 	renderer.activateRenderMeshesShaderProg();
 
+	GLint pid = 0;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &pid);
+	if (pid)
+	{
+		GLint locOn = glGetUniformLocation(pid, "uFogOn");
+		GLint locCol = glGetUniformLocation(pid, "uFogColor");
+		GLint locFS = glGetUniformLocation(pid, "uFogStart");
+		GLint locFE = glGetUniformLocation(pid, "uFogEnd");
+		if (locOn >= 0)
+			glUniform1i(locOn, gFogOn ? 1 : 0);
+		if (locCol >= 0)
+			glUniform3f(locCol, gFogColor[0], gFogColor[1], gFogColor[2]);
+		if (locFS >= 0)
+			glUniform1f(locFS, gFogStart);
+		if (locFE >= 0)
+			glUniform1f(locFE, gFogEnd);
+	}
+
 	update();
 
 	renderer.setTexUnit(0, 0);
@@ -996,6 +1018,12 @@ void processKeys(unsigned char key, int xx, int yy)
 	case 'n':
 		dayMode = !dayMode;
 		printf("Ambient Light %s\n", spotlight_mode ? "ON" : "OFF");
+		break;
+	
+	case 'f':
+	case 'F':
+		gFogOn = !gFogOn;
+		printf("Fog %s\n", gFogOn ? "ON" : "OFF");
 		break;
 
 	case 'm':
