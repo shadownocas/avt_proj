@@ -22,105 +22,6 @@ using namespace std;
 
 Renderer::Renderer() {}
 
-bool Renderer::truetypeInit(const std::string& fontFile) {
-
-    // Read the font file
-    ifstream inputStream(fontFile.c_str(), std::ios::binary);
-
-    if (inputStream.fail()) {
-        printf("\nError opening font file.\n");
-        return(false);
-    }
-
-    inputStream.seekg(0, std::ios::end);
-    auto&& fontFileSize = inputStream.tellg();
-    inputStream.seekg(0, std::ios::beg);
-
-    uint8_t* fontDataBuf = new uint8_t[fontFileSize];
-
-    inputStream.read((char*)fontDataBuf, fontFileSize);
-
-    if (!fontDataBuf) {
-        cerr << "Failed to load buffer with font data\n";
-        return false;
-    }
-
-    if (!stbtt_InitFont(&font.info, fontDataBuf, 0)) {
-        cerr << "stbtt_InitFont() Failed!\n";
-        return false;
-    }
-
-    inputStream.close();
-
-    constexpr auto TEX_SIZE = 1024; //Font atlast width and height
-    uint8_t* fontAtlasTextureData = new uint8_t[TEX_SIZE * TEX_SIZE];
-    //auto pixels = std::make_unique<uint8_t[]>(TEX_SIZE * TEX_SIZE);
-
-    stbtt_pack_context pack_context;
-    if (!stbtt_PackBegin(&pack_context, fontAtlasTextureData, TEX_SIZE, TEX_SIZE, 0, 1, nullptr)) {
-        cerr << "Failed to start font packing\n";
-        return false;
-    }
-
-    font.size = 128.f;
-    stbtt_pack_range range{
-            font.size,
-            32,
-            nullptr,
-            96,
-            font.packedChars
-    };
-
-    if (!stbtt_PackFontRanges(&pack_context, fontDataBuf, 0, &range, 1)) {
-        cerr << "Failed to pack font ranges\n";
-        return false;
-    }
-
-    stbtt_PackEnd(&pack_context);
-
-    for (int i = 0; i < 96; i++)
-    {
-        float unusedX, unusedY;
-
-        stbtt_GetPackedQuad(
-            font.packedChars,               // Array of stbtt_packedchar
-            TEX_SIZE,                           // Width of the font atlas texture
-            TEX_SIZE,                           // Height of the font atlas texture
-            i,                            // Index of the glyph
-            &unusedX, &unusedY,         // current position of the glyph in screen pixel coordinates, (not required as we have a different coordinate system)
-            &font.alignedQuads[i],              // stbtt_alligned_quad struct. (this struct mainly consists of the texture coordinates)
-            0                        // Allign X and Y position to a integer (doesn't matter because we are not using 'unusedX' and 'unusedY')
-        );
-    }
-
-    //each glyph quad texture needs just one color channel: 0 in background and 1 for the actual character pixels. Use it for alpha blending
-    //It creates a texture object in TexObjArray for storing the fontAtlasTexture
-    TexObjArray.texture2D_Loader(TEX_SIZE, TEX_SIZE, fontAtlasTextureData);
-    GLuint texID_loc = TexObjArray.getNumTextureObjects() - 1; //position of font atlas textureObj in the textureArray;
-    printf("The texture object #%d stores fontAtlasTexture\n", texID_loc + 1);
-    font.textureId = TexObjArray.getTextureId(texID_loc);
-
-    // configure VAO/VBO for char (glyph) texture aligned quads
-    //each vertex will have just the Position attribute containing 4 floats: (vec2 pos, vec2 tex)
-    // -----------------------------------
-    glGenVertexArrays(1, &textVAO);
-    glGenBuffers(2, textVBO);
-    glBindVertexArray(textVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 16, nullptr, GL_DYNAMIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
-    //index buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, textVBO[1]);
-    GLuint quadFaceIndex[] = { 0,1,2,2,3,0 };
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadFaceIndex), quadFaceIndex, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
-    return true;
-}
 
 
 bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, const std::string& fragShaderPath) {
@@ -248,17 +149,14 @@ void Renderer::setDirectionalLight(float* dir, float* color) {
 
 void Renderer::setLampLights(const std::vector<PointLight> &pointLights, bool lampsOn)
 {
-    glUseProgram(program); // make sure the shader is active
+    glUseProgram(program);
 
-    // 1️⃣ Number of lamps
     GLint locNum = glGetUniformLocation(program, "numLamps");
     glUniform1i(locNum, (GLint)pointLights.size());
 
-    // 2️⃣ On/off toggle
     GLint locOn = glGetUniformLocation(program, "lampsOn");
     glUniform1i(locOn, lampsOn ? 1 : 0);
 
-    // 3️⃣ Loop through all point lights
     for (size_t i = 0; i < pointLights.size(); ++i)
     {
         std::string base = "pointLights[" + std::to_string(i) + "]";
@@ -293,9 +191,6 @@ void Renderer::setDroneSpotLights(SpotLight* lights, int count, bool enabled) {
         glUniform1f(glGetUniformLocation(program, (base + ".atten.linear").c_str()), lights[i].atten.linear);
         glUniform1f(glGetUniformLocation(program, (base + ".atten.exp").c_str()), lights[i].atten.exp);
     }
-
-    // send number of spotlights
-    //glUniform1i(glGetUniformLocation(program, "numSpotLights"), count);
 }
 
 
@@ -330,62 +225,9 @@ void Renderer::renderMesh(const dataMesh& data) {
 
     // --- Set alpha threshold for transparent objects ---
     GLint locAlpha = glGetUniformLocation(program, "alpha_threshold");
-    glUniform1f(locAlpha, 0.05f);  // tweak 0.05–0.2
+    glUniform1f(locAlpha, 0.05f);
 
     glBindVertexArray(mesh.vao);
     glDrawElements(mesh.type, mesh.numIndexes, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
-
-void Renderer::renderText(const TextCommand& text) {
-
-    glUseProgram(textProgram);   //use GLSL program for text rendering
-    glUniformMatrix4fv(fontPvm_loc, 1, GL_FALSE, text.pvm);
-    glUniform4fv(textColor_loc, 1, text.color);
-    glBindVertexArray(textVAO);
-
-    float localPosition[2] = { text.position[0], text.position[1] };   //screen coordinates
-
-    for (auto ch : text.str) {
-
-        if (ch > 32 && ch < 127) {
-            // Retrieve the data that is used to render a glyph of character 'ch'
-            stbtt_packedchar packedChar = font.packedChars[ch - 32];
-            stbtt_aligned_quad alignedQuad = font.alignedQuads[ch - 32];
-
-            // The units of the fields of the above structs are in pixels,
-
-            float glyphSize[2] = { (float)(packedChar.x1 - packedChar.x0) * text.size,(float)(packedChar.y1 - packedChar.y0) * text.size };
-            float glyphBoundingBoxBottomLeft[2] = { localPosition[0] + (packedChar.xoff * text.size), (localPosition[1] - packedChar.yoff2) * text.size };
-
-            // The order of vertices of a quad goes top-right, top-left, bottom-left, bottom-right
-            //each vertex will have just the Position attribute containing 4 floats: (vec2 pos, vec2 tex), in total 16 floats
-            float glyphVertices[16] = { glyphBoundingBoxBottomLeft[0] + glyphSize[0], glyphBoundingBoxBottomLeft[1] + glyphSize[1], alignedQuad.s1, alignedQuad.t0,
-                glyphBoundingBoxBottomLeft[0], glyphBoundingBoxBottomLeft[1] + glyphSize[1], alignedQuad.s0, alignedQuad.t0,
-                glyphBoundingBoxBottomLeft[0], glyphBoundingBoxBottomLeft[1], alignedQuad.s0, alignedQuad.t1,
-                glyphBoundingBoxBottomLeft[0] + glyphSize[0], glyphBoundingBoxBottomLeft[1], alignedQuad.s1, alignedQuad.t1 };
-
-            // update content of VBO memory
-            glBindBuffer(GL_ARRAY_BUFFER, textVBO[0]);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glyphVertices), glyphVertices);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Update the position to render the next glyph specified by packedChar->xadvance.
-            localPosition[0] += packedChar.xadvance * text.size;
-        }
-        // Handle newlines seperately.
-        else if (ch == '\n')
-        {
-            // advance y by fontSize, reset x-coordinate
-            localPosition[1] -= 1.0 * font.size * text.size;
-            localPosition[0] = text.position[0];
-        }
-        else if (ch == ' ')
-        {
-            // advance x by fontSize, keep y-coordinate
-            localPosition[0] += 0.2 * font.size * text.size;
-        }
-    }
-}
-
-

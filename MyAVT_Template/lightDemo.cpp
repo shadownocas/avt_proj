@@ -245,12 +245,12 @@ void changeSize(int w, int h)
 	glViewport(0, 0, w, h); //viewport is whole window
 	ratio = (1.0f * w) / h;
 	int m_viewport[4];
+	
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
 	mu.loadIdentity(gmu::PROJECTION);
 	if (activeCam == 0 || activeCam == 2)
 	{
 		mu.perspective(53.13f, ratio, 0.1f, 1000.0f);
-		printf("entra change size prespectiev");
 	}
 	else
 	{
@@ -401,23 +401,25 @@ void updateDrone(float dt) {
 		drone.direction[2] /= mag;
 	}
 
-	auto recoverComponent = [](float& x, float& z, float recoverySpeed) {
-		float mag = sqrtf(x*x + z*z);
+	auto recoverComponent = [](float& x, float& y, float& z, float recoverySpeed) {
+		float mag = sqrtf(x*x + z*z + y*y);
 		if (mag > 0.0f) {
 			float scale = (mag - recoverySpeed) / mag;
 			scale = std::max(scale, 0.0f);
 			x *= scale;
 			z *= scale;
+			y *= scale;
 		}
 	};
 
 	if (!( spKeys[GLUT_KEY_LEFT] || spKeys[GLUT_KEY_RIGHT] || spKeys[GLUT_KEY_UP] || spKeys[GLUT_KEY_DOWN])) {
 		// Recover rotation
-		recoverComponent(drone.rotation[0], drone.rotation[2], 0.5f);
+		float tempRot = 0.0f;
+		recoverComponent(drone.rotation[0], drone.rotation[2], tempRot, 0.5f);
 
 		// Recover direction
-		if (drone.direction[0] != 0.0f || drone.direction[2] != 0.0f) {
-			recoverComponent(drone.direction[0], drone.direction[2], 0.01f);
+		if (drone.direction[0] != 0.0f || drone.direction[1] != 0.0f) {
+			recoverComponent(drone.direction[0], drone.direction[1], drone.direction[2], 0.01f);
 		}
 	}
 
