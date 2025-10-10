@@ -220,6 +220,7 @@ float gFogColor[3] = {0.65f, 0.72f, 0.80f};
 //Text management
 bool pause = false;
 bool restart = false;
+bool gameOver = false;
 
 
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
@@ -320,6 +321,17 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
 // Render stufff
 //
 
+void restartDrone(){
+	drone.position[0] = 20.0f;
+	drone.position[1] = 20.0f;
+	drone.position[2] = -20.0f;
+
+	drone.direction[0] = 0.0f;
+	drone.direction[1] = 0.0f;
+	drone.direction[2] = 0.0f;
+}
+
+
 void rotateDrone(float x, float y, float z, float dt) {
 	drone.rotation[0] += x * dt;
 	drone.rotation[1] += drone.velRot * dt;
@@ -330,6 +342,10 @@ void moveDrone(float dt) {
 	drone.position[0] += drone.direction[0] * drone.speed * dt;
 	drone.position[1] += drone.direction[1] * drone.speed * dt;
 	drone.position[2] += drone.direction[2] * drone.speed * dt;
+
+	if (restart) {
+		restartDrone();
+	}
 }
 
 void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZAdd) {
@@ -355,6 +371,25 @@ void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZ
     drone.rotation[2] = rotZ;
 }
 
+void manageBattery(float dt){
+	float drainRate = 1.0f;
+	drone.battery -= (drone.speed / 4.0f) * drainRate * dt; //4 is max speed FIX
+
+	if (drone.battery < 0.0f) drone.battery = 0.0f;
+
+	if( restart) {
+		printf("ENTROU RESTART ITS BATTERy");
+		drone.battery = 100.0f;
+		restart = false;
+	}
+
+	if (drone.battery == 0.0f) {//Game over
+		printf("ENTROU PAUSE = TREUE E GAMEOVER");
+		pause = true;
+		gameOver = true;
+	}
+
+}
 
 void updateDrone(float dt) {
 	const float MAX_VSPEED = 1.0f;
@@ -441,12 +476,7 @@ void updateDrone(float dt) {
 	}
 
 	moveDrone(dt);
-
-	float drainRate = 1.0f;
-	drone.battery -= (drone.speed / 4.0f) * drainRate * dt; //4 is max speed
-
-	// Clamp battery
-	if (drone.battery < 0.0f) drone.battery = 0.0f;
+	manageBattery(dt);
 }
 
 void updateCameras(){
@@ -586,7 +616,7 @@ void update(){
 		}
 	}
 	
-	if(!pause) { 
+	if(!pause && !gameOver) { 
 		static bool collisionPushedBack = false;
 		if (drone.mode == NORMAL) {
 			if (collision()) {
@@ -604,13 +634,7 @@ void update(){
 
 			if (flyingColision == true) {
 				// Reset to initial pos
-				drone.position[0] = 20.0f;
-				drone.position[1] = 20.0f;
-				drone.position[2] = -20.0f;
-
-				drone.direction[0] = 0.0f;
-				drone.direction[1] = 0.0f;
-				drone.direction[2] = 0.0f;
+				restartDrone();
 				flyingColision = false;
 				drone.mode = NORMAL;
 			} 
@@ -637,8 +661,8 @@ void update(){
 			}
 		}
 		updateFlyingObjects(dt);
+		updateCamera2();
 	}
-	updateCamera2();
     updateCameras();
 }
 
@@ -1005,6 +1029,22 @@ void renderSim(void)
 			renderer.renderText(energyCmd);
 		}
 
+		// Energy percentage text
+		TextCommand energyPercentCmd;
+		char energyStr[32];
+		sprintf(energyStr, "%.0f%%", drone.battery);
+
+		energyPercentCmd.str = energyStr;
+		energyPercentCmd.position[0] = startX + maxEnergy * spacing + 40;
+		energyPercentCmd.position[1] = startY + 80;
+		energyPercentCmd.size = 0.5f;
+		energyPercentCmd.color[0] = 1.0f; 
+		energyPercentCmd.color[1] = 1.0f; 
+		energyPercentCmd.color[2] = 1.0f; 
+		energyPercentCmd.color[3] = 1.0f;
+		energyPercentCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		renderer.renderText(energyPercentCmd);
+
 		// Render points
 		TextCommand pointsCmd;
 		pointsCmd.str = "Points: 120";
@@ -1024,6 +1064,65 @@ void renderSim(void)
 		glDisable(GL_BLEND);
 		glEnable(GL_DEPTH_TEST);
 	}
+
+	if (gameOver) {
+		printf("Game over rendering!\n");
+
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND);
+		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+		int m_viewport[4];
+		glGetIntegerv(GL_VIEWPORT, m_viewport);
+
+		mu.pushMatrix(gmu::MODEL);
+		mu.pushMatrix(gmu::VIEW);
+		mu.pushMatrix(gmu::PROJECTION);
+
+		mu.loadIdentity(gmu::MODEL);
+		mu.loadIdentity(gmu::VIEW);
+		mu.loadIdentity(gmu::PROJECTION);
+		mu.ortho(m_viewport[0], m_viewport[0] + m_viewport[2] - 1, 
+				m_viewport[1], m_viewport[1] + m_viewport[3] - 1, -1, 1);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+
+		TextCommand gameOverCmd;
+		gameOverCmd.str = "GAME OVER";
+		/* gameOverCmd.align_x = Align::Left;
+
+		gameOverCmd.position[0] = m_viewport[2] - 300;
+		//gameOverCmd.position[1] = m_viewport[3] / 2.0f;
+		gameOverCmd.position[1] = 120; */
+
+		float textWidth = 100.0f;  // estimate width of text in pixels
+		float textHeight = 80.0f;  // estimate height of text
+
+		// center manually
+		 gameOverCmd.position[0] = m_viewport[2] - 1280;
+		gameOverCmd.position[1] = 120;
+		/* gameOverCmd.position[0] = 512.0f;
+gameOverCmd.position[1] = 384.0f; */
+
+printf("Viewport: x=%d, y=%d, width=%d, height=%d\n",
+       m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+		gameOverCmd.size = 2.5f;
+		gameOverCmd.color[0] = 1.0f;
+		gameOverCmd.color[1] = 0.0f;
+		gameOverCmd.color[2] = 0.0f;
+		gameOverCmd.color[3] = 1.0f;
+		gameOverCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+
+		renderer.renderText(gameOverCmd);
+
+		mu.popMatrix(gmu::PROJECTION);
+		mu.popMatrix(gmu::VIEW);
+		mu.popMatrix(gmu::MODEL);
+
+		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
+	}
+
+
 		
 
 	glutSwapBuffers();
@@ -1078,6 +1177,7 @@ void processKeys(unsigned char key, int xx, int yy)
 		printf("restart game!\n");
 		restart = true;
 		pause = false;
+		gameOver = false;
 		break;
 	case '1':
 		activeCam = 0;
