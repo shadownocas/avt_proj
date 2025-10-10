@@ -1088,24 +1088,13 @@ void renderSim(void)
 
 		TextCommand gameOverCmd;
 		gameOverCmd.str = "GAME OVER";
-		/* gameOverCmd.align_x = Align::Left;
+		
+		gameOverCmd.position[0] = m_viewport[2] - m_viewport[2] * 0.80f;
+		gameOverCmd.position[1] = m_viewport[3] - m_viewport[3] * 0.6f;
 
-		gameOverCmd.position[0] = m_viewport[2] - 300;
-		//gameOverCmd.position[1] = m_viewport[3] / 2.0f;
-		gameOverCmd.position[1] = 120; */
-
-		float textWidth = 100.0f;  // estimate width of text in pixels
-		float textHeight = 80.0f;  // estimate height of text
-
-		// center manually
-		 gameOverCmd.position[0] = m_viewport[2] - 1280;
-		gameOverCmd.position[1] = 120;
-		/* gameOverCmd.position[0] = 512.0f;
-gameOverCmd.position[1] = 384.0f; */
-
-printf("Viewport: x=%d, y=%d, width=%d, height=%d\n",
-       m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
-		gameOverCmd.size = 2.5f;
+		printf("Viewport: x=%d, y=%d, width=%d, height=%d\n",
+       		m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+		gameOverCmd.size = 2.0f;
 		gameOverCmd.color[0] = 1.0f;
 		gameOverCmd.color[1] = 0.0f;
 		gameOverCmd.color[2] = 0.0f;
