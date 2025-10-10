@@ -37,6 +37,10 @@ using namespace std;
 
 #define CAPTION "AVT 2025 Welcome Demo"
 #define LAMP_POST_NUMBER 6
+
+const string fontPathFile = "fonts/arial.ttf";
+bool fontLoaded = false;
+
 int WindowHandle = 0;
 int WinX = 1024, WinY = 768;
 
@@ -208,6 +212,10 @@ bool gFogOn = false;
 float gFogStart = 60.0f;
 float gFogEnd = 180.0f;
 float gFogColor[3] = {0.65f, 0.72f, 0.80f};
+
+//Text management
+bool pause = false;
+bool restart = false;
 
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
 
@@ -555,54 +563,56 @@ void update(){
 	float dt = (nowMs - prevMs) / 1000.0f;
 	prevMs = nowMs;
 	
-	static bool collisionPushedBack = false;
-	if (drone.mode == NORMAL) {
-		if (collision()) {
-			drone.mode = COLLISION;
-			collisionPushedBack = false; // Reset
-			animationCollision = 0.0f;
-		} else {
-			updateDrone(dt); // Normal movement
+	if(!pause) { 
+
+		static bool collisionPushedBack = false;
+		if (drone.mode == NORMAL) {
+			if (collision()) {
+				drone.mode = COLLISION;
+				collisionPushedBack = false; // Reset
+				animationCollision = 0.0f;
+			} else {
+				updateDrone(dt); // Normal movement
+			}
 		}
-	}
-	else if (drone.mode == COLLISION) {
+		else if (drone.mode == COLLISION) {
 
-		if (flyingColision == true) {
-			// Reset to initial pos
-			drone.position[0] = 20.0f;
-			drone.position[1] = 20.0f;
-			drone.position[2] = -20.0f;
+			if (flyingColision == true) {
+				// Reset to initial pos
+				drone.position[0] = 20.0f;
+				drone.position[1] = 20.0f;
+				drone.position[2] = -20.0f;
 
-			drone.direction[0] = 0.0f;
-			drone.direction[1] = 0.0f;
-			drone.direction[2] = 0.0f;
-			flyingColision = false;
-			drone.mode = NORMAL;
-		} 
-		else{
-			if (!collisionPushedBack) {
-				float pushBackDistance = 1.0f; 
-				
-				drone.position[0] -= drone.direction[0] * pushBackDistance;
-				drone.position[1] -= drone.direction[1] * pushBackDistance;
-				drone.position[2] -= drone.direction[2] * pushBackDistance;
-
-				// Freeze movement
 				drone.direction[0] = 0.0f;
 				drone.direction[1] = 0.0f;
 				drone.direction[2] = 0.0f;
-
-				collisionPushedBack = true;
-			}
-
-			animationCollision += dt;
-			if (animationCollision >= animationCollisionDuration) { 
+				flyingColision = false;
 				drone.mode = NORMAL;
+			} 
+			else{
+				if (!collisionPushedBack) {
+					float pushBackDistance = 1.0f; 
+					
+					drone.position[0] -= drone.direction[0] * pushBackDistance;
+					drone.position[1] -= drone.direction[1] * pushBackDistance;
+					drone.position[2] -= drone.direction[2] * pushBackDistance;
+
+					// Freeze movement
+					drone.direction[0] = 0.0f;
+					drone.direction[1] = 0.0f;
+					drone.direction[2] = 0.0f;
+
+					collisionPushedBack = true;
+				}
+
+				animationCollision += dt;
+				if (animationCollision >= animationCollisionDuration) { 
+					drone.mode = NORMAL;
+				}
 			}
 		}
-    }
-
-	updateFlyingObjects(dt);
+		updateFlyingObjects(dt);
+	}
 	updateCamera2();
     updateCameras();
 }
@@ -619,7 +629,6 @@ void renderSim(void)
 	renderer.activateRenderMeshesShaderProg();
 
 	renderer.setFog(gFogOn, gFogColor, gFogStart, gFogEnd);
-
 	update();
 
 	renderer.setTexUnit(0, 0);
@@ -933,6 +942,63 @@ void renderSim(void)
 	}
 	glDepthMask(GL_TRUE);
 
+	if(!pause){
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND);  
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		int m_viewport[4];
+		glGetIntegerv(GL_VIEWPORT, m_viewport);
+
+		// Save current matrices
+		mu.pushMatrix(gmu::MODEL);
+		mu.pushMatrix(gmu::VIEW);
+		mu.pushMatrix(gmu::PROJECTION);
+
+		// Setup ortho for HUD
+		mu.loadIdentity(gmu::MODEL);
+		mu.loadIdentity(gmu::VIEW);
+		mu.loadIdentity(gmu::PROJECTION);
+		mu.ortho(m_viewport[0], m_viewport[0] + m_viewport[2] - 1, 
+				m_viewport[1], m_viewport[1] + m_viewport[3] - 1, -1, 1);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+
+		// Render energy
+		int maxEnergy = 5;
+		int currentEnergy = 4;
+		float startX = 50, startY = 50, spacing = 40;
+		for (int i = 0; i < maxEnergy; ++i) {
+			TextCommand energyCmd;
+			energyCmd.str = (i < currentEnergy) ? "H" : " ";
+			energyCmd.position[0] = startX + i * spacing;
+			energyCmd.position[1] = startY;
+			energyCmd.size = 1.0f;
+			energyCmd.color[0] = 1.0f; energyCmd.color[1] = 1.0f; energyCmd.color[2] = 0.0f; energyCmd.color[3] = 1.0f;
+			energyCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+			renderer.renderText(energyCmd);
+		}
+
+		// Render points
+		TextCommand pointsCmd;
+		pointsCmd.str = "Points: 120";
+		pointsCmd.align_x = Align::Left;
+		pointsCmd.position[0] = m_viewport[2] - 300; 
+		pointsCmd.position[1] = 120;
+		pointsCmd.size = 0.5f;
+		pointsCmd.color[0] = pointsCmd.color[1] = pointsCmd.color[2] = pointsCmd.color[3] = 1.0f;
+		pointsCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		renderer.renderText(pointsCmd);
+
+		// Restore original matrices
+		mu.popMatrix(gmu::PROJECTION);
+		mu.popMatrix(gmu::VIEW);
+		mu.popMatrix(gmu::MODEL);
+
+		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
+	}
+		
+
 	glutSwapBuffers();
 }
 
@@ -977,12 +1043,14 @@ void processKeys(unsigned char key, int xx, int yy)
 		gFogOn = !gFogOn;
 		printf("Fog %s\n", gFogOn ? "ON" : "OFF");
 		break;
-
-	case 'm':
-		glEnable(GL_MULTISAMPLE);
-		break;
 	case 'p':
-		glDisable(GL_MULTISAMPLE);
+		printf("paused game!\n");
+		pause = !pause;
+		break;
+	case 'r':
+		printf("restart game!\n");
+		restart = true;
+		pause = false;
 		break;
 	case '1':
 		activeCam = 0;
@@ -996,6 +1064,7 @@ void processKeys(unsigned char key, int xx, int yy)
 	case '4':
 		activeCam = 3;
 		break;
+	
 	}
 }
 
@@ -1303,6 +1372,15 @@ void buildScene()
 	cams[1].camPos[1] = 200.0;
 	cams[1].camPos[2] = 0.33;
 	cams[1].type = 1;
+
+	//The truetypeInit creates a texture object in TexObjArray for storing the fontAtlasTexture
+	
+	fontLoaded = renderer.truetypeInit(fontPathFile);
+	if (!fontLoaded)
+		cerr << "Fonts not loaded\n";
+	else 
+		cerr << "Fonts loaded\n";
+
 }
 
 // ------------------------------------------------------------
@@ -1371,8 +1449,9 @@ int main(int argc, char **argv)
 
 	buildScene();
 
-	if (!renderer.setRenderMeshesShaderProg("shaders/mesh.vert", "shaders/mesh.frag"))
-		return (1);
+	if(!renderer.setRenderMeshesShaderProg("shaders/mesh.vert", "shaders/mesh.frag") || 
+		!renderer.setRenderTextShaderProg("shaders/ttf.vert", "shaders/ttf.frag"))
+	return(1);
 
 	//  GLUT main loop
 	glutMainLoop();

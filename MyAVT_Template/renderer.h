@@ -25,6 +25,15 @@ enum class Align {
     Bottom = Left,
 };
 
+struct TextCommand {
+    std::string str{};
+    float position[2];  //screen coordinates
+    float size = 1.f;
+    float color[4] = {1.f,1.f,1.f, 1.f};
+    float *pvm;
+    Align align_x = Align::Center, align_y = Align::Center;
+};
+
 struct Lamp {
   float x, y, z;
   float w = 1.0f; 
@@ -56,6 +65,8 @@ public:
   Renderer();
   ~Renderer();
 
+  bool truetypeInit(const std::string &ttf_filepath);  //Initialization of TRUETYPE  for text rendering
+
   //Setup render meshes GLSL program
   bool setRenderMeshesShaderProg(const std::string &vertShaderPath, const std::string &fragShaderPath);
 
@@ -65,6 +76,8 @@ public:
   void activateRenderMeshesShaderProg();
 
   void renderMesh(const dataMesh &data);
+
+  void renderText(const TextCommand &text);
 
   void setLightPos(float *lightPos);
 
