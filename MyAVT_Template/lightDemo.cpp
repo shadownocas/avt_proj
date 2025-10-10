@@ -32,9 +32,6 @@
 #include "model.h"
 #include "texture.h"
 #include <cmath>	 // sinf, cosf, atan2f
-#include "stb_image.h"
-
-GLuint backgroundTex = 0; // global
 
 using namespace std;
 
@@ -43,7 +40,6 @@ using namespace std;
 #define cimg_use_png
 
 const string fontPathFile = "fonts/arial.ttf";
-std::string backgroundPauseFile = "assets/pause_menu.png";
 bool fontLoaded = false;
 
 int WindowHandle = 0;
@@ -87,6 +83,9 @@ struct Drone
 	AABB aabb;
 	AABB worldAABB;
 	DroneMode mode = NORMAL;
+
+	float battery;
+    int points;
 };
 
 struct FlyingObject
@@ -442,6 +441,12 @@ void updateDrone(float dt) {
 	}
 
 	moveDrone(dt);
+
+	float drainRate = 1.0f;
+	drone.battery -= (drone.speed / 4.0f) * drainRate * dt; //4 is max speed
+
+	// Clamp battery
+	if (drone.battery < 0.0f) drone.battery = 0.0f;
 }
 
 void updateCameras(){
@@ -568,15 +573,29 @@ void update(){
 		prevMs = nowMs;
 	float dt = (nowMs - prevMs) / 1000.0f;
 	prevMs = nowMs;
+
+	static bool initDone = false;
+	static float initTimer = 0.0f;
+
+	if (!initDone) {
+		initTimer += dt;
+		if (initTimer < 0.2f) {
+			return;
+		} else {
+			initDone = true;
+		}
+	}
 	
 	if(!pause) { 
-
 		static bool collisionPushedBack = false;
 		if (drone.mode == NORMAL) {
 			if (collision()) {
 				drone.mode = COLLISION;
 				collisionPushedBack = false; // Reset
 				animationCollision = 0.0f;
+
+				drone.battery -= 100.0f / 5.0f; // 20 units
+    			if (drone.battery < 0.0f) drone.battery = 0.0f;
 			} else {
 				updateDrone(dt); // Normal movement
 			}
@@ -623,46 +642,6 @@ void update(){
     updateCameras();
 }
 
-void renderBackground() {
-    if (!backgroundTex){ 
-		  printf("entrouuuuuuuuuuuu!\n");
-	return; // texture not loaded
-	}
-
-    int viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    int width = viewport[2];
-    int height = viewport[3];
-
-    glDisable(GL_DEPTH_TEST);      // draw behind everything
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, backgroundTex);
-
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(0, width, 0, height, -1, 1);
-
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glBegin(GL_QUADS);
-        glTexCoord2f(0,0); glVertex2f(0,0);
-        glTexCoord2f(1,0); glVertex2f(width,0);
-        glTexCoord2f(1,1); glVertex2f(width,height);
-        glTexCoord2f(0,1); glVertex2f(0,height);
-    glEnd();
-
-    glPopMatrix(); // modelview
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-
-    glDisable(GL_TEXTURE_2D);
-    glEnable(GL_DEPTH_TEST);
-}
-
-
 void renderSim(void)
 {
 
@@ -675,11 +654,6 @@ void renderSim(void)
 	renderer.activateRenderMeshesShaderProg();
 
 	renderer.setFog(gFogOn, gFogColor, gFogStart, gFogEnd);
-	if (pause){ 
-		renderBackground();
-		printf("entrou no render back");
-	}
-
 
 	update();
 
@@ -1017,7 +991,8 @@ void renderSim(void)
 
 		// Render energy
 		int maxEnergy = 5;
-		int currentEnergy = 4;
+		int currentEnergy = static_cast<int>((drone.battery / 100.0f) * maxEnergy + 0.5f);
+		printf("the crrent energy: %d\n", currentEnergy);
 		float startX = 50, startY = 50, spacing = 40;
 		for (int i = 0; i < maxEnergy; ++i) {
 			TextCommand energyCmd;
@@ -1207,44 +1182,6 @@ void mouseWheel(int wheel, int direction, int x, int y)
         if (zoomCam2 < 5.0f) zoomCam2 = 5.0f;
     }
 	
-}
-
-
-GLuint loadBackgroundTexture(const char* filename) {
-    // Flip image vertically: OpenGL expects (0,0) at bottom-left
-    stbi_set_flip_vertically_on_load(true);
-
-    int width, height, channels;
-    unsigned char* data = stbi_load(filename, &width, &height, &channels, 0);
-    if (!data) {
-        std::cerr << "Failed to load background image: " << filename << std::endl;
-        return 0;
-    }
-
-    GLuint textureID;
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    // Determine format
-    GLenum format = (channels == 3) ? GL_RGB : GL_RGBA;
-    GLenum internalFormat = (channels == 3) ? GL_RGB8 : GL_RGBA8;
-
-    // Upload texture data to GPU
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-
-    // Set texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // Clamp to edge to avoid repeating artifacts
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    stbi_image_free(data);
-
-    std::cout << "Background loaded: " << filename << " (" << width << "x" << height << ")" << std::endl;
-
-    return textureID;
 }
 
 //
@@ -1451,6 +1388,9 @@ void buildScene()
 		drone.direction[1] = 0.0f;
 		drone.direction[2] = -1.0f;
 		drone.aabb = allMeshes.cube.aabb;
+
+		drone.battery = 100.0f;
+		drone.points = 0;
 	}
 
 	floorObj.aabb = allMeshes.quad.aabb;
@@ -1471,7 +1411,6 @@ void buildScene()
 	else 
 		cerr << "Fonts loaded\n";
 
-	loadBackgroundTexture(backgroundPauseFile.c_str());
 }
 
 // ------------------------------------------------------------
