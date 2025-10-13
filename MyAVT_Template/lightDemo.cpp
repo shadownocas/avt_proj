@@ -17,6 +17,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <array>
 
 // include GLEW to access OpenGL 3.3 functions
 #include <GL/glew.h>
@@ -666,6 +667,23 @@ void update(){
     updateCameras();
 }
 
+void renderText(const std::string& textStr, const float position[2], const float color[3], float size) {
+	TextCommand txt;
+	txt.str = textStr;
+		
+	txt.position[0] = position[0];
+	txt.position[1] = position[1];
+
+	txt.size = size;
+	txt.color[0] = color[0];
+	txt.color[1] = color[1];
+	txt.color[2] = color[2];
+	txt.color[3] = color[3];
+	txt.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+
+	renderer.renderText(txt);
+}
+
 void renderSim(void)
 {
 
@@ -992,130 +1010,94 @@ void renderSim(void)
 	}
 	glDepthMask(GL_TRUE);
 
-	if(!pause){
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_BLEND);  
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	std::array<float, 2> position;
+	std::array<float, 4> color;
 
-		int m_viewport[4];
-		glGetIntegerv(GL_VIEWPORT, m_viewport);
 
-		// Save current matrices
-		mu.pushMatrix(gmu::MODEL);
-		mu.pushMatrix(gmu::VIEW);
-		mu.pushMatrix(gmu::PROJECTION);
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);  
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-		// Setup ortho for HUD
-		mu.loadIdentity(gmu::MODEL);
-		mu.loadIdentity(gmu::VIEW);
-		mu.loadIdentity(gmu::PROJECTION);
-		mu.ortho(m_viewport[0], m_viewport[0] + m_viewport[2] - 1, 
-				m_viewport[1], m_viewport[1] + m_viewport[3] - 1, -1, 1);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+	int m_viewport[4];
+	glGetIntegerv(GL_VIEWPORT, m_viewport);
 
+	// Save current matrices
+	mu.pushMatrix(gmu::MODEL);
+	mu.pushMatrix(gmu::VIEW);
+	mu.pushMatrix(gmu::PROJECTION);
+
+	// Setup ortho for HUD
+	mu.loadIdentity(gmu::MODEL);
+	mu.loadIdentity(gmu::VIEW);
+	mu.loadIdentity(gmu::PROJECTION);
+	mu.ortho(m_viewport[0], m_viewport[0] + m_viewport[2] - 1, 
+			m_viewport[1], m_viewport[1] + m_viewport[3] - 1, -1, 1);
+	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+
+	if (!pause) {
 		// Render energy
 		int maxEnergy = 5;
 		int currentEnergy = static_cast<int>((drone.battery / 100.0f) * maxEnergy + 0.5f);
 		printf("the crrent energy: %d\n", currentEnergy);
 		float startX = 50, startY = 50, spacing = 40;
 		for (int i = 0; i < maxEnergy; ++i) {
-			TextCommand energyCmd;
-			energyCmd.str = (i < currentEnergy) ? "H" : " ";
-			energyCmd.position[0] = startX + i * spacing;
-			energyCmd.position[1] = startY;
-			energyCmd.size = 1.0f;
-			energyCmd.color[0] = 1.0f; energyCmd.color[1] = 1.0f; energyCmd.color[2] = 0.0f; energyCmd.color[3] = 1.0f;
-			energyCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-			renderer.renderText(energyCmd);
+			std::string str = (i < currentEnergy) ? "H" : " ";
+			position = { startX + i * spacing, startY };
+			color = { 1.0f, 1.0f, 0.0f, 1.0f };
+			renderText(str, position.data(), color.data(), 1.0f);
 		}
 
 		// Energy percentage text
-		TextCommand energyPercentCmd;
 		char energyStr[32];
 		sprintf(energyStr, "%.0f%%", drone.battery);
-
-		energyPercentCmd.str = energyStr;
-		energyPercentCmd.position[0] = startX + maxEnergy * spacing + 40;
-		energyPercentCmd.position[1] = startY + 80;
-		energyPercentCmd.size = 0.5f;
-		energyPercentCmd.color[0] = 1.0f; 
-		energyPercentCmd.color[1] = 1.0f; 
-		energyPercentCmd.color[2] = 1.0f; 
-		energyPercentCmd.color[3] = 1.0f;
-		energyPercentCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		renderer.renderText(energyPercentCmd);
+		position  = { startX + maxEnergy * spacing + 40, startY + 80 };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(energyStr, position.data(), color.data(), 0.5f);
 
 		// Render points
-		TextCommand pointsCmd;
-		pointsCmd.str = "Points: 120";
-		pointsCmd.align_x = Align::Left;
-		pointsCmd.position[0] = m_viewport[2] - 300; 
-		pointsCmd.position[1] = 120;
-		pointsCmd.size = 0.5f;
-		pointsCmd.color[0] = pointsCmd.color[1] = pointsCmd.color[2] = pointsCmd.color[3] = 1.0f;
-		pointsCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		renderer.renderText(pointsCmd);
+		std::string pointsStr = "Points: 120";
+		position = { static_cast<float>(m_viewport[2]) - 300, 120 };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(pointsStr, position.data(), color.data(), 0.5f);
 
-		// Restore original matrices
-		mu.popMatrix(gmu::PROJECTION);
-		mu.popMatrix(gmu::VIEW);
-		mu.popMatrix(gmu::MODEL);
-
-		glDisable(GL_BLEND);
-		glEnable(GL_DEPTH_TEST);
 	}
 
 	if (gameOver) {
-		printf("Game over rendering!\n");
-
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_BLEND);
-		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-		int m_viewport[4];
-		glGetIntegerv(GL_VIEWPORT, m_viewport);
-
-		mu.pushMatrix(gmu::MODEL);
-		mu.pushMatrix(gmu::VIEW);
-		mu.pushMatrix(gmu::PROJECTION);
-
-		mu.loadIdentity(gmu::MODEL);
-		mu.loadIdentity(gmu::VIEW);
-		mu.loadIdentity(gmu::PROJECTION);
-		mu.ortho(m_viewport[0], m_viewport[0] + m_viewport[2] - 1, 
-				m_viewport[1], m_viewport[1] + m_viewport[3] - 1, -1, 1);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-
-		TextCommand gameOverCmd;
-		gameOverCmd.str = "GAME OVER";
-		
-		gameOverCmd.position[0] = m_viewport[2] - m_viewport[2] * 0.80f;
-		gameOverCmd.position[1] = m_viewport[3] - m_viewport[3] * 0.6f;
-
-		printf("Viewport: x=%d, y=%d, width=%d, height=%d\n",
-       		m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
-		gameOverCmd.size = 2.0f;
-		gameOverCmd.color[0] = 1.0f;
-		gameOverCmd.color[1] = 0.0f;
-		gameOverCmd.color[2] = 0.0f;
-		gameOverCmd.color[3] = 1.0f;
-		gameOverCmd.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-
-		renderer.renderText(gameOverCmd);
-
-		mu.popMatrix(gmu::PROJECTION);
-		mu.popMatrix(gmu::VIEW);
-		mu.popMatrix(gmu::MODEL);
-
-		glDisable(GL_BLEND);
-		glEnable(GL_DEPTH_TEST);
+		std::string gameOverStr = "GAME OVER";
+		position = { m_viewport[2] - m_viewport[2] * 0.80f,  m_viewport[3] - m_viewport[3] * 0.6f };
+		color = { 1.0f, 0.0f, 0.0f, 1.0f };
+		renderText(gameOverStr, position.data(), color.data(), 2.0f);
 	}
 
+	if (pause) {
+		std::string pauseStr = "PAUSE";
+		position = { m_viewport[2] - m_viewport[2] * 0.60f,  m_viewport[3] - m_viewport[3] * 0.6f };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(pauseStr, position.data(), color.data(), 2.0f);
 
-		
+		std::string resumeStr = "Press P to resume";
+		position = { m_viewport[2] - m_viewport[2] * 0.65f,   m_viewport[3] - m_viewport[3] * 0.5f };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(resumeStr, position.data(), color.data(), 1.0f);
+
+		std::string restartStr = "Press R to restart";
+		position = { m_viewport[2] - m_viewport[2] * 0.65f,   m_viewport[3] - m_viewport[3] * 0.6f };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(restartStr, position.data(), color.data(), 1.0f);
+	}
+
+	// Restore original matrices
+	mu.popMatrix(gmu::PROJECTION);
+	mu.popMatrix(gmu::VIEW);
+	mu.popMatrix(gmu::MODEL);
+
+	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
 
 	glutSwapBuffers();
 }
+
+
 
 // ------------------------------------------------------------
 //
