@@ -89,6 +89,19 @@ struct Drone
     int points;
 };
 
+struct Package
+{
+	float position[3] = {20.0f, 20.0f, -20.0f};
+	float direction[3] = {0.0f, 0.0f, -1.0f};
+	float rotation[3] = {0.0f, 0.0f, 0.0f};
+	float speed;
+	float yaw;
+	float velRot;
+	AABB aabb;
+	AABB worldAABB;
+	DroneMode mode = NORMAL;
+};
+
 struct FlyingObject
 {
 	float position[3];
@@ -153,6 +166,8 @@ std::vector<Lamp> lampPositions;
 
 std::vector<Building> buildings;
 
+Package package;
+
 Drone drone;
 float followDistance = 15.0f;
 float startFollowDistance = 20.f;
@@ -211,6 +226,7 @@ float gardenD = gardenHalfD * 2.0f;
 
 // Collision
 bool flyingColision = false;
+bool collisionPackage = false;
 
 // Fog
 bool gFogOn = false;
@@ -330,6 +346,8 @@ void restartDrone(){
 	drone.direction[0] = 0.0f;
 	drone.direction[1] = 0.0f;
 	drone.direction[2] = 0.0f;
+
+	drone.speed = 0.0f;
 }
 
 
@@ -350,7 +368,7 @@ void moveDrone(float dt) {
 }
 
 void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZAdd) {
-    if (drone.speed < 12.0f) drone.speed += 2.0f;
+    if (drone.speed < 12.0f) drone.speed += 1.0f;
 
     // Vertical movement
     drone.direction[1] -= 0.005f;
@@ -378,7 +396,7 @@ void manageBattery(float dt){
 
 	if (drone.battery < 0.0f) drone.battery = 0.0f;
 
-	if( restart) {
+	if (restart) {
 		printf("ENTROU RESTART ITS BATTERy");
 		drone.battery = 100.0f;
 		restart = false;
@@ -393,7 +411,7 @@ void manageBattery(float dt){
 }
 
 void updateDrone(float dt) {
-	const float MAX_VSPEED = 1.0f;
+	const float MAX_VSPEED = 0.1f;
 
 	drone.rotation[1] = fmodf(drone.rotation[1], 360.0f);
 	if (drone.rotation[1] < 0.0f) drone.rotation[1] += 360.0f;
@@ -450,7 +468,7 @@ void updateDrone(float dt) {
 		drone.direction[2] /= mag;
 	}
 
-	auto recoverComponent = [](float& x, float& y, float& z, float recoverySpeed) {
+	auto recoverComponent = [](float& x, float& y, float& z, float recoverySpeed) -> float {
 		float mag = sqrtf(x*x + z*z + y*y);
 		if (mag > 0.0f) {
 			float scale = (mag - recoverySpeed) / mag;
@@ -458,17 +476,28 @@ void updateDrone(float dt) {
 			x *= scale;
 			z *= scale;
 			y *= scale;
+			mag *= scale;
 		}
+		 return mag;
 	};
 
 	if (!( spKeys[GLUT_KEY_LEFT] || spKeys[GLUT_KEY_RIGHT] || spKeys[GLUT_KEY_UP] || spKeys[GLUT_KEY_DOWN])) {
 		// Recover rotation
 		float tempRot = 0.0f;
+		float dirMag = 0.0f;
 		recoverComponent(drone.rotation[0], drone.rotation[2], tempRot, 0.5f);
 
 		// Recover direction
 		if (drone.direction[0] != 0.0f || drone.direction[1] != 0.0f) {
-			recoverComponent(drone.direction[0], drone.direction[1], drone.direction[2], 0.01f);
+			dirMag = recoverComponent(drone.direction[0], drone.direction[1], drone.direction[2], 0.01f);
+		}
+
+		if (dirMag > 0.001f) {
+			const float friction = 1.0f;
+			drone.speed -= friction * dt;
+			if (drone.speed < 0.0f) drone.speed = 0.0f;
+		} else {
+			drone.speed = 0.0f;
 		}
 	}
 
@@ -559,6 +588,19 @@ void updateFlyingObjects(float dt){
 	}
 }
 
+void updatePackage(float dt) {
+	if (!collisionPackage) {
+		return;
+	}
+	// Attach the package under the drone
+    package.position[0] = drone.position[0];
+    package.position[1] = drone.position[1] - 1.0f; // just below drone body
+    package.position[2] = drone.position[2];
+
+    drone.worldAABB.aabbmin[1] = package.worldAABB.aabbmin[1];
+    drone.worldAABB.aabbmax[1] = std::max(drone.worldAABB.aabbmax[1], package.worldAABB.aabbmax[1]);
+}
+
 bool collision(){
 	bool collisionDetected = false;
 	for (Building &b : buildings) {
@@ -594,6 +636,11 @@ bool collision(){
 		printf("COLLISION with FLOOR object!");
 		collisionDetected = true;
 	}
+
+	if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, package.worldAABB.aabbmin, package.worldAABB.aabbmax)) {
+		collisionPackage = true;
+	}
+
 	return collisionDetected;
 }
 
@@ -625,7 +672,7 @@ void update(){
 				collisionPushedBack = false; // Reset
 				animationCollision = 0.0f;
 
-				drone.battery -= 100.0f / 5.0f; // 20 units
+				drone.battery -= 100.0f / 5.0f;
     			if (drone.battery < 0.0f) drone.battery = 0.0f;
 			} else {
 				updateDrone(dt); // Normal movement
@@ -662,6 +709,7 @@ void update(){
 			}
 		}
 		updateFlyingObjects(dt);
+		updatePackage(dt);
 		updateCamera2();
 	}
     updateCameras();
@@ -991,6 +1039,29 @@ void renderSim(void)
     }
 	renderer.setLampLights(pointLights, lampsOn);
 
+	// --- Draw package ---
+	{ 
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
+
+		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+
+		float* modelMatrix = mu.get(gmu::MODEL);
+		AABB aabbBox = updateGlobalAABB(package.aabb, modelMatrix);
+		package.worldAABB = aabbBox;
+
+		data.mesh = &allMeshes.cube;
+		data.texMode = 4;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+	}
+
 	// --- Draw bulb ---
 	glDepthMask(GL_FALSE);
 	for (LampPost &lamp : lampPosts) {
@@ -1013,7 +1084,6 @@ void renderSim(void)
 	std::array<float, 2> position;
 	std::array<float, 4> color;
 
-
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);  
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1034,11 +1104,10 @@ void renderSim(void)
 			m_viewport[1], m_viewport[1] + m_viewport[3] - 1, -1, 1);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
-	if (!pause) {
+	if (!pause && !gameOver) {
 		// Render energy
 		int maxEnergy = 5;
 		int currentEnergy = static_cast<int>((drone.battery / 100.0f) * maxEnergy + 0.5f);
-		printf("the crrent energy: %d\n", currentEnergy);
 		float startX = 50, startY = 50, spacing = 40;
 		for (int i = 0; i < maxEnergy; ++i) {
 			std::string str = (i < currentEnergy) ? "H" : " ";
@@ -1069,7 +1138,7 @@ void renderSim(void)
 		renderText(gameOverStr, position.data(), color.data(), 2.0f);
 	}
 
-	if (pause) {
+	if (pause && !gameOver) {
 		std::string pauseStr = "PAUSE";
 		position = { m_viewport[2] - m_viewport[2] * 0.60f,  m_viewport[3] - m_viewport[3] * 0.6f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -1464,6 +1533,18 @@ void buildScene()
 		drone.points = 0;
 	}
 
+	// --- INITIALIZE PACKAGE ---
+	{
+		int randomIndex = rand() % buildings.size();
+		Building& chosen = buildings[randomIndex];
+
+		float height = buildingHeights[chosen.row][chosen.col];
+		package.position[0] = chosen.position[0] + chosen.width / 2.0f - 0.5f; //subtract hald package size
+		package.position[1] = height;
+		package.position[2] = chosen.position[2] + chosen.depth / 2.0f - 1.0f;
+		package.aabb = allMeshes.cube.aabb;
+	}
+
 	floorObj.aabb = allMeshes.quad.aabb;
 
 	cams[0].camPos[1] = 200.0;
@@ -1473,8 +1554,6 @@ void buildScene()
 	cams[1].camPos[1] = 200.0;
 	cams[1].camPos[2] = 0.33;
 	cams[1].type = 1;
-
-	//The truetypeInit creates a texture object in TexObjArray for storing the fontAtlasTexture
 	
 	fontLoaded = renderer.truetypeInit(fontPathFile);
 	if (!fontLoaded)
