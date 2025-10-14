@@ -589,17 +589,32 @@ void updateFlyingObjects(float dt){
 }
 
 void updatePackage(float dt) {
-	if (!collisionPackage) {
-		return;
-	}
-	// Attach the package under the drone
-    package.position[0] = drone.position[0];
-    package.position[1] = drone.position[1] - 1.0f; // just below drone body
-    package.position[2] = drone.position[2];
+    if (!collisionPackage) return;
 
+    float pivotX = drone.position[0];
+    float pivotY = drone.position[1] - 1.0f;
+    float pivotZ = drone.position[2];
+
+    float yawRad   = mu.DegToRad(drone.rotation[1]);
+    float pitchRad = mu.DegToRad(followPitchOffsetDeg);
+
+    float offsetX = sinf(yawRad) * cosf(pitchRad);
+    float offsetY = sinf(pitchRad);
+    float offsetZ = cosf(yawRad) * cosf(pitchRad);
+
+    package.position[0] = pivotX - offsetX;
+    package.position[1] = pivotY + offsetY;
+    package.position[2] = pivotZ - offsetZ;
+
+	package.rotation[0]  = drone.rotation[0];
+	package.rotation[1] = drone.rotation[1] ;
+	package.rotation[2] = drone.rotation[2];
+
+    // Update AABB (for collision if needed)
     drone.worldAABB.aabbmin[1] = package.worldAABB.aabbmin[1];
     drone.worldAABB.aabbmax[1] = std::max(drone.worldAABB.aabbmax[1], package.worldAABB.aabbmax[1]);
 }
+
 
 bool collision(){
 	bool collisionDetected = false;
@@ -1043,6 +1058,9 @@ void renderSim(void)
 	{ 
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
+		mu.rotate(gmu::MODEL, package.rotation[0], 1.0f, 0.0f, 0.0f);
+		mu.rotate(gmu::MODEL, package.rotation[2], 0.0f, 0.0f, 1.0f);
+		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
 
 		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
