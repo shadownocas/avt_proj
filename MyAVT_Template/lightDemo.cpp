@@ -358,9 +358,17 @@ void rotateDrone(float x, float y, float z, float dt) {
 }
 
 void moveDrone(float dt) {
+	float prevPos[3] = { drone.position[0], drone.position[1], drone.position[2] };
 	drone.position[0] += drone.direction[0] * drone.speed * dt;
 	drone.position[1] += drone.direction[1] * drone.speed * dt;
 	drone.position[2] += drone.direction[2] * drone.speed * dt;
+
+	if(drone.battery <= 0.0f){
+		drone.speed = 0.0f;
+		drone.position[0] = prevPos[0];
+		drone.position[1] -= 0.1f;
+		drone.position[2] = prevPos[2];
+	}
 
 	if (restart) {
 		restartDrone();
@@ -401,13 +409,6 @@ void manageBattery(float dt){
 		drone.battery = 100.0f;
 		restart = false;
 	}
-
-	if (drone.battery == 0.0f) {//Game over
-		printf("ENTROU PAUSE = TREUE E GAMEOVER");
-		pause = true;
-		gameOver = true;
-	}
-
 }
 
 void updateDrone(float dt) {
@@ -592,7 +593,7 @@ void updatePackage(float dt) {
     if (!collisionPackage) return;
 
     float pivotX = drone.position[0];
-    float pivotY = drone.position[1] - 1.0f;
+    float pivotY = drone.position[1] - 1.5f;
     float pivotZ = drone.position[2];
 
     float yawRad   = mu.DegToRad(drone.rotation[1]);
@@ -688,7 +689,11 @@ void update(){
 				animationCollision = 0.0f;
 
 				drone.battery -= 100.0f / 5.0f;
-    			if (drone.battery < 0.0f) drone.battery = 0.0f;
+    			if (drone.battery <= 0.0f){
+					drone.battery = 0.0f;
+					pause = true;
+					gameOver = true;
+				}
 			} else {
 				updateDrone(dt); // Normal movement
 			}
