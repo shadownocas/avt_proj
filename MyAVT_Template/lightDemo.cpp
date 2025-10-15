@@ -135,6 +135,7 @@ struct Building
 	float position[3];
 	float width, depth;
 	int row, col;
+	bool goal = false;
 	AABB aabb;
 	AABB worldAABB;
 };
@@ -333,20 +334,41 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
     return obj;
 }
 
+AABB mergeAABBs(const AABB& a, const AABB& b) {
+    AABB merged;
+    merged.aabbmin[0] = std::min(a.aabbmin[0], b.aabbmin[0]);
+    merged.aabbmin[1] = std::min(a.aabbmin[1], b.aabbmin[1]);
+    merged.aabbmin[2] = std::min(a.aabbmin[2], b.aabbmin[2]);
+
+    merged.aabbmax[0] = std::max(a.aabbmax[0], b.aabbmax[0]);
+    merged.aabbmax[1] = std::max(a.aabbmax[1], b.aabbmax[1]);
+    merged.aabbmax[2] = std::max(a.aabbmax[2], b.aabbmax[2]);
+
+    return merged;
+}
+
 // ------------------------------------------------------------
 //
 // Render stufff
 //
 
 void randomPackagePos(){
-	int randomIndex = rand() % buildings.size();
-	Building& chosen = buildings[randomIndex];
+    int randomIndex = rand() % buildings.size();
+    Building& chosen = buildings[randomIndex];
 
-	float height = buildingHeights[chosen.row][chosen.col];
-	package.position[0] = chosen.position[0] + chosen.width / 2.0f - 0.5f; //subtract hald package size
-	package.position[1] = height;
-	package.position[2] = chosen.position[2] + chosen.depth / 2.0f - 1.0f;
+    int goalIndex;
+    do {
+        goalIndex = rand() % buildings.size();
+    } while (goalIndex == randomIndex);
+
+    buildings[goalIndex].goal = true;
+
+    float height = buildingHeights[chosen.row][chosen.col];
+    package.position[0] = chosen.position[0] + chosen.width / 2.0f - 0.5f; // subtract half package size
+    package.position[1] = height;
+    package.position[2] = chosen.position[2] + chosen.depth / 2.0f - 1.0f;
 }
+
 
 void restartPackage(){
 	randomPackagePos();
@@ -370,6 +392,14 @@ void restartDrone(){
 	drone.speed = 0.0f;
 }
 
+void restartGoal(){
+	for (Building& b : buildings) {
+        if (b.goal) {
+            b.goal = false;
+            break; // assuming only one goal at a time
+        }
+    }
+}
 
 void rotateDrone(float x, float y, float z, float dt) {
 	drone.rotation[0] += x * dt;
@@ -421,11 +451,11 @@ void manageBattery(float dt){
 	if (drone.battery < 0.0f) drone.battery = 0.0f;
 
 	if (restart) {
-		printf("ENTROU RESTART ITS BATTERy");
 		drone.battery = 100.0f;
 		restart = false;
 		collisionPackage = false;
 		restartDrone();
+		restartGoal();
 		restartPackage();
 	}
 }
@@ -628,10 +658,6 @@ void updatePackage(float dt) {
 	package.rotation[0]  = drone.rotation[0];
 	package.rotation[1] = drone.rotation[1] ;
 	package.rotation[2] = drone.rotation[2];
-
-    // Update AABB (for collision if needed)
-    drone.worldAABB.aabbmin[1] = package.worldAABB.aabbmin[1];
-    drone.worldAABB.aabbmax[1] = std::max(drone.worldAABB.aabbmax[1], package.worldAABB.aabbmax[1]);
 }
 
 
@@ -726,7 +752,7 @@ void update(){
 			} 
 			else{
 				if (!collisionPushedBack) {
-					float pushBackDistance = 1.0f; 
+					float pushBackDistance = collisionPackage ? 10.0f : 1.0f; //FIX
 					
 					drone.position[0] -= drone.direction[0] * pushBackDistance;
 					drone.position[1] -= drone.direction[1] * pushBackDistance;
@@ -741,7 +767,7 @@ void update(){
 				}
 
 				animationCollision += dt;
-				if (animationCollision >= animationCollisionDuration) { 
+				if (animationCollision >= animationCollisionDuration ) { 
 					drone.mode = NORMAL;
 				}
 			}
@@ -927,8 +953,11 @@ void renderSim(void)
 		mu.computeNormalMatrix3x3();
 
 		float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(drone.aabb, modelMatrix);
-		drone.worldAABB = aabbBox;
+		if (collisionPackage){
+			drone.worldAABB = mergeAABBs( drone.worldAABB , package.worldAABB);
+		} else {
+			drone.worldAABB = updateGlobalAABB(drone.aabb, modelMatrix);
+		}
 
 		data.mesh = &allMeshes.cube;
 		data.texMode = 4;
@@ -1025,7 +1054,7 @@ void renderSim(void)
 		b.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
-		data.texMode = 3;
+		data.texMode = b.goal? 4 : 3;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -1084,9 +1113,10 @@ void renderSim(void)
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
 
 		mu.translate(gmu::MODEL, 0.5f, 0.5f, 1.0f);
+
+		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
 		mu.rotate(gmu::MODEL, package.rotation[0], 1.0f, 0.0f, 0.0f);
 		mu.rotate(gmu::MODEL, package.rotation[2], 0.0f, 0.0f, 1.0f);
-		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
 		mu.translate(gmu::MODEL, -0.5f, -0.5f, -1.0f);
 
 		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
