@@ -338,14 +338,34 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
 // Render stufff
 //
 
+void randomPackagePos(){
+	int randomIndex = rand() % buildings.size();
+	Building& chosen = buildings[randomIndex];
+
+	float height = buildingHeights[chosen.row][chosen.col];
+	package.position[0] = chosen.position[0] + chosen.width / 2.0f - 0.5f; //subtract hald package size
+	package.position[1] = height;
+	package.position[2] = chosen.position[2] + chosen.depth / 2.0f - 1.0f;
+}
+
+void restartPackage(){
+	randomPackagePos();
+
+	package.rotation[0] = 0.0f;
+	package.rotation[1] = 0.0f;
+	package.rotation[2] = 0.0f;
+
+	package.speed = 0.0f;
+}
+
 void restartDrone(){
 	drone.position[0] = 20.0f;
 	drone.position[1] = 20.0f;
 	drone.position[2] = -20.0f;
 
-	drone.direction[0] = 0.0f;
-	drone.direction[1] = 0.0f;
-	drone.direction[2] = 0.0f;
+	drone.rotation[0] = 0.0f;
+	drone.rotation[1] = 0.0f;
+	drone.rotation[2] = 0.0f;
 
 	drone.speed = 0.0f;
 }
@@ -368,10 +388,6 @@ void moveDrone(float dt) {
 		drone.position[0] = prevPos[0];
 		drone.position[1] -= 0.1f;
 		drone.position[2] = prevPos[2];
-	}
-
-	if (restart) {
-		restartDrone();
 	}
 }
 
@@ -408,6 +424,9 @@ void manageBattery(float dt){
 		printf("ENTROU RESTART ITS BATTERy");
 		drone.battery = 100.0f;
 		restart = false;
+		collisionPackage = false;
+		restartDrone();
+		restartPackage();
 	}
 }
 
@@ -507,7 +526,6 @@ void updateDrone(float dt) {
 	}
 
 	moveDrone(dt);
-	manageBattery(dt);
 }
 
 void updateCameras(){
@@ -728,10 +746,11 @@ void update(){
 				}
 			}
 		}
+		manageBattery(dt);
 		updateFlyingObjects(dt);
 		updatePackage(dt);
-		updateCamera2();
 	}
+	updateCamera2();
     updateCameras();
 }
 
@@ -1063,9 +1082,12 @@ void renderSim(void)
 	{ 
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
+
+		mu.translate(gmu::MODEL, 0.5f, 0.5f, 1.0f);
 		mu.rotate(gmu::MODEL, package.rotation[0], 1.0f, 0.0f, 0.0f);
 		mu.rotate(gmu::MODEL, package.rotation[2], 0.0f, 0.0f, 1.0f);
 		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
+		mu.translate(gmu::MODEL, -0.5f, -0.5f, -1.0f);
 
 		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
@@ -1558,13 +1580,7 @@ void buildScene()
 
 	// --- INITIALIZE PACKAGE ---
 	{
-		int randomIndex = rand() % buildings.size();
-		Building& chosen = buildings[randomIndex];
-
-		float height = buildingHeights[chosen.row][chosen.col];
-		package.position[0] = chosen.position[0] + chosen.width / 2.0f - 0.5f; //subtract hald package size
-		package.position[1] = height;
-		package.position[2] = chosen.position[2] + chosen.depth / 2.0f - 1.0f;
+		randomPackagePos();
 		package.aabb = allMeshes.cube.aabb;
 	}
 
