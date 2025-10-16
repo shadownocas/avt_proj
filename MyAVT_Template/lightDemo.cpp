@@ -163,8 +163,6 @@ struct Billboard {
 	AABB worldAABB;
 };
 
-int fireworks = 0;
-
 struct Particle {
 	float	life;		// vida
 	float	fade;		// fade
@@ -253,6 +251,7 @@ float gardenD = gardenHalfD * 2.0f;
 // Collision
 bool flyingColision = false;
 bool collisionPackage = false;
+bool fireworks = false;
 
 // Fog
 bool gFogOn = false;
@@ -264,6 +263,8 @@ float gFogColor[3] = {0.65f, 0.72f, 0.80f};
 bool pause = false;
 bool restart = false;
 bool gameOver = false;
+bool gameWin = false;
+int finalScore = 0;
 
 
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
@@ -566,7 +567,7 @@ void manageBattery(float dt){
 	if (drone.battery < 0.0f) drone.battery = 0.0f;
 
 	if (restart) {
-		drone.battery = 100.0f;
+		drone.battery = 300.0f;
 		restart = false;
 		collisionPackage = false;
 		restartDrone();
@@ -770,7 +771,19 @@ bool collision(){
 	for (Building &b : buildings) {
 		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
 			printf("COLLISION with BUILDING object!");
-			fireworks = 1;
+			if (b.goal && collisionPackage){
+				float droneBottomY = drone.worldAABB.aabbmin[1];
+				float buildingTopY = b.worldAABB.aabbmax[1];
+
+				if (droneBottomY >= buildingTopY - 2.0f) {
+					gameWin = true;
+					finalScore += (int)drone.battery * 10;
+					pause = true;
+					return false;
+				}
+			}
+
+			fireworks = true;
 			iniParticles();
 			collisionDetected = true;
 		}
@@ -1290,7 +1303,7 @@ void renderSim(void)
 		glDisable(GL_BLEND);
 
 		if (dead_num_particles == MAX_PARTICULAS) {
-			fireworks = 0;
+			fireworks = false;
 			dead_num_particles = 0;
 			printf("All particles dead\n");
 		}
@@ -1360,11 +1373,23 @@ void renderSim(void)
 		renderText(energyStr, position.data(), color.data(), 0.5f);
 
 		// Render points
-		std::string pointsStr = "Points: 120";
+		std::string pointsStr = "Points: " + std::to_string(finalScore);
 		position = { static_cast<float>(m_viewport[2]) - 300, 120 };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(pointsStr, position.data(), color.data(), 0.5f);
 
+	}
+
+	if (gameWin) {
+		std::string gameOverStr = "YOU WON!";
+		position = { m_viewport[2] - m_viewport[2] * 0.70f,  m_viewport[3] - m_viewport[3] * 0.6f };
+		color = { 1.0f, 0.0f, 0.0f, 1.0f };
+		renderText(gameOverStr, position.data(), color.data(), 2.0f);
+
+		std::string pointsStr = "Points: " + std::to_string(finalScore);
+		position = { m_viewport[2] - m_viewport[2] * 0.58f,  m_viewport[3] - m_viewport[3] * 0.7f };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(pointsStr, position.data(), color.data(), 1.0f);
 	}
 
 	if (gameOver) {
@@ -1374,7 +1399,7 @@ void renderSim(void)
 		renderText(gameOverStr, position.data(), color.data(), 2.0f);
 	}
 
-	if (pause && !gameOver) {
+	if (pause && !gameOver && !gameWin) {
 		std::string pauseStr = "PAUSE";
 		position = { m_viewport[2] - m_viewport[2] * 0.60f,  m_viewport[3] - m_viewport[3] * 0.6f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -1780,7 +1805,7 @@ void buildScene()
 		drone.direction[2] = -1.0f;
 		drone.aabb = allMeshes.cube.aabb;
 
-		drone.battery = 100.0f;
+		drone.battery = 300.0f;
 		drone.points = 0;
 	}
 
