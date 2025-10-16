@@ -168,12 +168,12 @@ int fireworks = 0;
 struct Particle {
 	float	life;		// vida
 	float	fade;		// fade
-	GLfloat x, y, z;    // posi��o
-	GLfloat vx, vy, vz; // velocidade 
-	GLfloat ax, ay, az; // acelera��o
+	GLfloat x, y, z; 
+	GLfloat vx, vy, vz; // velocity 
+	GLfloat ax, ay, az; // aceleration
 };
 
-Particle particles[1500];
+Particle particles[MAX_PARTICULAS];
 int dead_num_particles = 0;
 
 MeshCollection allMeshes;
@@ -361,15 +361,23 @@ AABB updateGlobalAABB(AABB result, float* modelMatrix) {
 
 AABB mergeAABBs(const AABB& a, const AABB& b) {
     AABB merged;
-    merged.aabbmin[0] = std::min(a.aabbmin[0], b.aabbmin[0]);
-    merged.aabbmin[1] = std::min(a.aabbmin[1], b.aabbmin[1]);
-    merged.aabbmin[2] = std::min(a.aabbmin[2], b.aabbmin[2]);
-
-    merged.aabbmax[0] = std::max(a.aabbmax[0], b.aabbmax[0]);
-    merged.aabbmax[1] = std::max(a.aabbmax[1], b.aabbmax[1]);
-    merged.aabbmax[2] = std::max(a.aabbmax[2], b.aabbmax[2]);
+    for (int i = 0; i < 3; ++i) {
+        merged.aabbmin[i] = std::min(a.aabbmin[i], b.aabbmin[i]);
+        merged.aabbmax[i] = std::max(a.aabbmax[i], b.aabbmax[i]);
+    }
 
     return merged;
+}
+
+
+bool checkAABBCollision(const float minA[3], const float maxA[3], const float minB[3], const float maxB[3]) {
+    for (int i = 0; i < 3; i++) {
+        if (maxA[i] < minB[i] || minA[i] > maxB[i]) {
+            return false; 
+        }
+    }
+
+    return true;
 }
 
 // ------------------------------------------------------------
@@ -704,16 +712,6 @@ void updateCamera2()
     cams[2].camTarget[2] = pivotZ;
 }
 
-
-bool checkAABBCollision(const float minA[3], const float maxA[3], const float minB[3], const float maxB[3]) {
-    for (int i = 0; i < 3; i++) {
-        if (maxA[i] < minB[i] || minA[i] > maxB[i]) {
-            return false; 
-        }
-    }
-    return true;
-}
-
 void updateFlyingObjects(float dt){
 	for (auto &obj : flyingObjects)
 	{
@@ -752,21 +750,20 @@ void updatePackage(float dt) {
     float pivotZ = drone.position[2];
 
     float yawRad   = mu.DegToRad(drone.rotation[1]);
-    float pitchRad = mu.DegToRad(followPitchOffsetDeg);
+    float pitchRad = mu.DegToRad(followPitchOffsetDeg); //FIX
 
     float offsetX = sinf(yawRad) * cosf(pitchRad);
     float offsetY = sinf(pitchRad);
     float offsetZ = cosf(yawRad) * cosf(pitchRad);
 
     package.position[0] = pivotX - offsetX;
-    package.position[1] = pivotY + offsetY;
+    package.position[1] = pivotY ;
     package.position[2] = pivotZ - offsetZ;
 
-	package.rotation[0]  = drone.rotation[0];
-	package.rotation[1] = drone.rotation[1] ;
-	package.rotation[2] = drone.rotation[2];
+    package.rotation[0] = drone.rotation[0];
+    package.rotation[1] = drone.rotation[1];
+    package.rotation[2] = drone.rotation[2];
 }
-
 
 bool collision(){
 	bool collisionDetected = false;
@@ -861,7 +858,7 @@ void update(){
 			} 
 			else{
 				if (!collisionPushedBack) {
-					float pushBackDistance = collisionPackage ? 10.0f : 1.0f; //FIX
+					float pushBackDistance = collisionPackage ? 2.0f : 1.0f;
 					
 					drone.position[0] -= drone.direction[0] * pushBackDistance;
 					drone.position[1] -= drone.direction[1] * pushBackDistance;
@@ -1064,8 +1061,9 @@ void renderSim(void)
 		mu.computeNormalMatrix3x3();
 
 		float* modelMatrix = mu.get(gmu::MODEL);
+		AABB droneBox = updateGlobalAABB(drone.aabb, modelMatrix);
 		if (collisionPackage){
-			drone.worldAABB = mergeAABBs( drone.worldAABB , package.worldAABB);
+			drone.worldAABB = mergeAABBs( droneBox , package.worldAABB);
 		} else {
 			drone.worldAABB = updateGlobalAABB(drone.aabb, modelMatrix);
 		}
@@ -1226,12 +1224,12 @@ void renderSim(void)
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
 
-		mu.translate(gmu::MODEL, 0.5f, 0.5f, 1.0f);
+		//mu.translate(gmu::MODEL, 0.5f, 0.5f, 1.0f);
 
 		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
 		mu.rotate(gmu::MODEL, package.rotation[0], 1.0f, 0.0f, 0.0f);
 		mu.rotate(gmu::MODEL, package.rotation[2], 0.0f, 0.0f, 1.0f);
-		mu.translate(gmu::MODEL, -0.5f, -0.5f, -1.0f);
+		//mu.translate(gmu::MODEL, -0.5f, -0.5f, -1.0f);
 
 		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
