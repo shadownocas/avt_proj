@@ -156,6 +156,7 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
     tex_loc[4] = glGetUniformLocation(program, "texmap4");
     tex_loc[5] = glGetUniformLocation(program, "texmap5");
     tex_loc[6] = glGetUniformLocation(program, "texmap6");
+    tex_loc[7] = glGetUniformLocation(program, "texmap7");
 
     return(shader.isProgramLinked() && shader.isProgramValid());
 }

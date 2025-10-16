@@ -153,7 +153,14 @@ struct Camera
 	int type = 0; // 0 and 2:perspective, 1:orthographic
 };
 
+struct Billboard {
+    float position[3];
+    int textureID;
+};
+
 MeshCollection allMeshes;
+
+Package package;
 
 std::vector<PointLight> pointLights;
 
@@ -167,7 +174,7 @@ std::vector<Lamp> lampPositions;
 
 std::vector<Building> buildings;
 
-Package package;
+std::vector<Billboard> billboards;
 
 Drone drone;
 float followDistance = 15.0f;
@@ -419,6 +426,39 @@ void moveDrone(float dt) {
 		drone.position[1] -= 0.1f;
 		drone.position[2] = prevPos[2];
 	}
+}
+
+void turnBillBoard(float *cam, float *worldPos) {
+    float lookAt[3]={0,0,1},objToCamProj[3],objToCam[3],upAux[3],angleCosine;
+
+    objToCamProj[0] = cam[0] - worldPos[0];
+    objToCamProj[1] = 0;
+    objToCamProj[2] = cam[2] - worldPos[2];
+    mu.normalize(objToCamProj);
+    mu.crossProduct(lookAt, objToCamProj, upAux);
+
+    angleCosine = mu.dotProduct(lookAt, objToCamProj);
+
+    if ((angleCosine < 0.99990) && (angleCosine > -0.9999)) {
+        mu.rotate(gmu::MODEL, acos(angleCosine)*180/3.14,upAux[0], upAux[1], upAux[2]);
+    }
+
+    objToCam[0] = cam[0] - worldPos[0];
+    objToCam[1] = cam[1] - worldPos[1];
+    objToCam[2] = cam[2] - worldPos[2];
+
+    mu.normalize(objToCam);
+
+    angleCosine = mu.dotProduct(objToCamProj, objToCam);
+
+    if ((angleCosine < 0.99990) && (angleCosine > -0.9999)) {
+        if (objToCam[1] < 0) {
+            mu.rotate(gmu::MODEL,acos(angleCosine)*180/3.14,1,0,0);
+        }
+        else {
+            mu.rotate(gmu::MODEL,acos(angleCosine)*180/3.14,-1,0,0);
+        }
+    }
 }
 
 void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZAdd) {
@@ -819,6 +859,8 @@ void renderSim(void)
 	renderer.setTexUnit(4, 4);
 	renderer.setTexUnit(5, 5);
 	renderer.setTexUnit(6, 6);
+	renderer.setTexUnit(7, 7);
+
 
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::MODEL);
@@ -1137,6 +1179,40 @@ void renderSim(void)
 		mu.popMatrix(gmu::MODEL);
 	}
 
+	{
+		for (Billboard& b : billboards) {
+
+			mu.pushMatrix(gmu::MODEL);
+
+			// Move to the billboard's position
+			mu.translate(gmu::MODEL, b.position[0], b.position[1], b.position[2]);
+
+			// Apply billboard rotation — cylindrical (Y-axis only) or spherical (full)
+
+			// Scale for visibility (optional)
+			mu.scale(gmu::MODEL, 2.0f, 2.0f, 2.0f); // or fixed 2.0f
+
+			turnBillBoard(cams[2].camPos, b.position);
+
+
+			// Compute matrices
+			mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+			mu.computeNormalMatrix3x3();
+
+			// Fill render data
+			data.mesh = &allMeshes.quad;	
+			data.texMode = b.textureID;
+			data.vm = mu.get(gmu::VIEW_MODEL);
+			data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+			data.normal = mu.getNormalMatrix();
+
+			renderer.renderMesh(data);
+
+			mu.popMatrix(gmu::MODEL);
+		}
+	}
+
+
 	// --- Draw bulb ---
 	glDepthMask(GL_FALSE);
 	for (LampPost &lamp : lampPosts) {
@@ -1413,6 +1489,7 @@ void buildScene()
 	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/grass.tga");
 	renderer.TexObjArray.texture2D_Loader("assets/road.tga");
+	renderer.TexObjArray.texture2D_Loader("assets/tree.tga");
 
 	// Scene geometry with triangle meshes
 	MyMesh amesh;
@@ -1612,6 +1689,16 @@ void buildScene()
 	{
 		randomPackagePos();
 		package.aabb = allMeshes.cube.aabb;
+	}
+
+	// --- INITIALIZE BILBOARDING ---
+	{
+		Billboard tree;
+		tree.position[0] = 10.0f;
+		tree.position[1] = 2.0f;
+		tree.position[2] = -5.0f;
+		tree.textureID = 7; //checker??
+		billboards.push_back(tree);
 	}
 
 	floorObj.aabb = allMeshes.quad.aabb;
