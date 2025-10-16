@@ -155,7 +155,10 @@ struct Camera
 
 struct Billboard {
     float position[3];
+    float scale[3];
     int textureID;
+	AABB aabb;
+	AABB worldAABB;
 };
 
 MeshCollection allMeshes;
@@ -1060,10 +1063,13 @@ void renderSim(void)
 	}
 
 	// --- Draw trees ---
-	for (Tree &tree : trees) {
+	for (Billboard &tree : billboards) {
         mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, tree.position[0], tree.position[1], tree.position[2]);
+        mu.translate(gmu::MODEL, tree.position[0], tree.position[1] + tree.scale[1] * 0.3, tree.position[2]);
         mu.scale(gmu::MODEL, tree.scale[0], tree.scale[1], tree.scale[2]);
+
+		turnBillBoard(cams[2].camPos, tree.position);
+
         mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
         mu.computeNormalMatrix3x3();
 
@@ -1071,8 +1077,8 @@ void renderSim(void)
 		AABB aabbBox = updateGlobalAABB(tree.aabb, modelMatrix);
 		tree.worldAABB = aabbBox;
 
-        data.mesh = &allMeshes.cone;
-        data.texMode = 5;
+       	data.mesh = &allMeshes.quad;	
+		data.texMode = tree.textureID;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1177,39 +1183,6 @@ void renderSim(void)
 
 		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
-	}
-
-	{
-		for (Billboard& b : billboards) {
-
-			mu.pushMatrix(gmu::MODEL);
-
-			// Move to the billboard's position
-			mu.translate(gmu::MODEL, b.position[0], b.position[1], b.position[2]);
-
-			// Apply billboard rotation — cylindrical (Y-axis only) or spherical (full)
-
-			// Scale for visibility (optional)
-			mu.scale(gmu::MODEL, 2.0f, 2.0f, 2.0f); // or fixed 2.0f
-
-			turnBillBoard(cams[2].camPos, b.position);
-
-
-			// Compute matrices
-			mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-			mu.computeNormalMatrix3x3();
-
-			// Fill render data
-			data.mesh = &allMeshes.quad;	
-			data.texMode = b.textureID;
-			data.vm = mu.get(gmu::VIEW_MODEL);
-			data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-			data.normal = mu.getNormalMatrix();
-
-			renderer.renderMesh(data);
-
-			mu.popMatrix(gmu::MODEL);
-		}
 	}
 
 
@@ -1657,17 +1630,18 @@ void buildScene()
         float rx = gardenCenterX + (gardenW / 2.2f - 4.0f) * cos(ang);
         float rz = gardenCenterZ + (gardenD / 2.2f - 4.0f) * sin(ang);
 
-        Tree tree;
+        Billboard tree;
         tree.position[0] = rx;
         tree.position[1] = 0.0f;
         tree.position[2] = rz;
 
-        tree.scale[0] = 1.5f;
-        tree.scale[1] = 4.0f;
-        tree.scale[2] = 1.5f;
-        tree.aabb = allMeshes.cone.aabb;
+        tree.scale[0] = 20.0f;
+        tree.scale[1] = 20.0f;
+        tree.scale[2] = 20.0f;
+		tree.textureID = 7;
+        tree.aabb = allMeshes.quad.aabb;
 
-        trees.push_back(tree);
+       	billboards.push_back(tree);
     }
 
 	// --- INITIALIZE DRONE ---
@@ -1689,16 +1663,6 @@ void buildScene()
 	{
 		randomPackagePos();
 		package.aabb = allMeshes.cube.aabb;
-	}
-
-	// --- INITIALIZE BILBOARDING ---
-	{
-		Billboard tree;
-		tree.position[0] = 10.0f;
-		tree.position[1] = 2.0f;
-		tree.position[2] = -5.0f;
-		tree.textureID = 7; //checker??
-		billboards.push_back(tree);
 	}
 
 	floorObj.aabb = allMeshes.quad.aabb;
