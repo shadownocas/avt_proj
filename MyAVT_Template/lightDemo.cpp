@@ -921,7 +921,6 @@ void renderText(const std::string& textStr, const float position[2], const float
 	renderer.renderText(txt);
 }
 
-
 void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
     dataMesh data;
 
@@ -935,41 +934,63 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
     float dist = sqrtf(float((lx - cx)*(lx - cx) + (ly - cy)*(ly - cy)));
     float scaleDistance = (maxDist - dist) / maxDist;
 
-    int flareMaxSize = int(m_viewport[2] * flare->fMaxSize);
-    int flareScale = int(m_viewport[2] * flare->fScale);
+    int flareScale = int(m_viewport[2] * flare->fScale * 0.1f);
+	int flareMaxSize = int(m_viewport[2] * flare->fMaxSize * 0.1f);
 
+    // Destination opposite to center
     int dx = mu.clampi(cx + (cx - lx), m_viewport[0], screenMaxX);
     int dy = mu.clampi(cy + (cy - ly), m_viewport[1], screenMaxY);
 
-    for (int i = 0; i < flare->nPieces; ++i) {
-        int px = (int)((1.0f - flare->element[i].fDistance) * lx + flare->element[i].fDistance * dx);
-        int py = (int)((1.0f - flare->element[i].fDistance) * ly + flare->element[i].fDistance * dy);
-        px = mu.clampi(px, m_viewport[0], screenMaxX);
-        py = mu.clampi(py, m_viewport[1], screenMaxY);
+    // --- Dynamically allocate index array ---
+    int* indices = new int[flare->nPieces];
+    for (int i = 0; i < flare->nPieces; ++i) indices[i] = i;
 
-        int width = int(scaleDistance * flareScale * flare->element[i].fSize);
-        if (width > flareMaxSize) width = flareMaxSize;
-
-        int height = int(float(m_viewport[3]) / float(m_viewport[2]) * width);
-
-        if (width <= 1) continue;
-
-        mu.pushMatrix(gmu::MODEL);
-        mu.loadIdentity(gmu::MODEL);
-        mu.translate(gmu::MODEL, float(px), float(py), 0.0f);
-        mu.scale(gmu::MODEL, float(width), float(height), 1.0f);
-        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-        mu.computeNormalMatrix3x3();
-
-        data.mesh = &allMeshes.quad;
-        data.texMode = flare->element[i].textureId;
-        data.vm = mu.get(gmu::VIEW_MODEL);
-        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-        data.normal = mu.getNormalMatrix();
-
-        renderer.renderMesh(data);
-        mu.popMatrix(gmu::MODEL);
+    // --- Simple bubble sort by fDistance descending ---
+    for (int i = 0; i < flare->nPieces - 1; ++i) {
+        for (int j = i + 1; j < flare->nPieces; ++j) {
+            if (flare->element[indices[i]].fDistance < flare->element[indices[j]].fDistance) {
+                int tmp = indices[i];
+                indices[i] = indices[j];
+                indices[j] = tmp;
+            }
+        }
     }
+
+    // --- Draw flares in sorted order ---
+    for (int i = 0; i < flare->nPieces; ++i) {
+		int idx = indices[i];
+
+		int px = (int)((1.0f - flare->element[idx].fDistance) * lx + flare->element[idx].fDistance * dx);
+		int py = (int)((1.0f - flare->element[idx].fDistance) * ly + flare->element[idx].fDistance * dy);
+
+		int width = int(scaleDistance * flareScale * flare->element[idx].fSize);
+
+		if (width > 200) width = 200;
+
+		if (width <= 1) continue;
+
+		mu.pushMatrix(gmu::MODEL);
+		mu.loadIdentity(gmu::MODEL);
+
+		// add tiny Z offset based on flare order
+		float z = 0.0f + 0.001f * i; 
+		mu.translate(gmu::MODEL, float(px), float(py), z);
+		mu.scale(gmu::MODEL, float(width), float(width), 1.0f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+
+		data.mesh = &allMeshes.quad;
+		data.texMode = flare->element[idx].textureId;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
+
+		mu.popMatrix(gmu::MODEL);
+	}
+
+
+    delete[] indices; // free memory
 }
 
 
@@ -999,8 +1020,6 @@ void renderLampFlare(const LampPost &lamp, bool flareEffect, int *m_viewport) {
     mu.ortho(0, m_viewport[2], 0, m_viewport[3], -1, 1);
 
     renderFlare(&AVTflare, flarePos[0], flarePos[1], m_viewport);
-
-    printf("Projected lamp top: (%.2f, %.2f, %.2f)\n", lightScreenPos[0], lightScreenPos[1], lightScreenPos[2]);
 
     mu.popMatrix(gmu::VIEW);
     mu.popMatrix(gmu::PROJECTION);
@@ -1286,6 +1305,25 @@ void renderSim(void)
 
 	pointLights.clear();
 
+	// --- Draw bulb ---
+	glDepthMask(GL_FALSE);
+	for (LampPost &lamp : lampPosts) {
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, lamp.position[0], lamp.height + 1.5, lamp.position[2]);
+        mu.scale(gmu::MODEL, 1.5f, 1.5f, 1.5f);
+        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+        mu.computeNormalMatrix3x3();
+
+        data.mesh = &allMeshes.sphere[0];
+        data.texMode = 2; // Transparency
+        data.vm = mu.get(gmu::VIEW_MODEL);
+        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+        data.normal = mu.getNormalMatrix();
+        renderer.renderMesh(data);
+        mu.popMatrix(gmu::MODEL);
+	}
+	glDepthMask(GL_TRUE);
+
 	int m_viewport[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
 	int i = 0;
@@ -1413,25 +1451,6 @@ void renderSim(void)
 		}
 
 	}
-
-	// --- Draw bulb ---
-	glDepthMask(GL_FALSE);
-	for (LampPost &lamp : lampPosts) {
-        mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, lamp.position[0], lamp.height + 1.5, lamp.position[2]);
-        mu.scale(gmu::MODEL, 1.5f, 1.5f, 1.5f);
-        mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-        mu.computeNormalMatrix3x3();
-
-        data.mesh = &allMeshes.sphere[0];
-        data.texMode = 2; // Transparency
-        data.vm = mu.get(gmu::VIEW_MODEL);
-        data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-        data.normal = mu.getNormalMatrix();
-        renderer.renderMesh(data);
-        mu.popMatrix(gmu::MODEL);
-	}
-	glDepthMask(GL_TRUE);
 
 	std::array<float, 2> position;
 	std::array<float, 4> color;
