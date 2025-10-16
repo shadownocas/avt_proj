@@ -161,6 +161,19 @@ struct Billboard {
 	AABB worldAABB;
 };
 
+int fireworks = 0;
+
+struct Particle {
+	float	life;		// vida
+	float	fade;		// fade
+	GLfloat x, y, z;    // posi��o
+	GLfloat vx, vy, vz; // velocidade 
+	GLfloat ax, ay, az; // acelera��o
+};
+
+Particle particles[1500];
+int dead_num_particles = 0;
+
 MeshCollection allMeshes;
 
 Package package;
@@ -462,6 +475,27 @@ void turnBillBoard(float *cam, float *worldPos) {
             mu.rotate(gmu::MODEL,acos(angleCosine)*180/3.14,-1,0,0);
         }
     }
+}
+
+void updateParticles()
+{
+	int i;
+	float h;
+
+	h = 0.033;
+	if (fireworks) {
+
+		for (i = 0; i < 1500; i++)
+		{
+			particles[i].x += (h*particles[i].vx);
+			particles[i].y += (h*particles[i].vy);
+			particles[i].z += (h*particles[i].vz);
+			particles[i].vx += (h*particles[i].ax);
+			particles[i].vy += (h*particles[i].ay);
+			particles[i].vz += (h*particles[i].az);
+			particles[i].life -= particles[i].fade;
+		}
+	}
 }
 
 void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZAdd) {
@@ -1185,6 +1219,54 @@ void renderSim(void)
 		mu.popMatrix(gmu::MODEL);
 	}
 
+	// ----- RENDER PARTICLES -----
+	if(fireworks){
+
+		updateParticles();
+
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDepthMask(GL_FALSE);
+		glEnable(GL_DEPTH_TEST);
+
+
+		dataMesh data;
+		data.meshID = 3;
+		data.texMode = 9;
+
+
+		for (int i = 0; i < 1500; ++i) {
+			if (particles[i].life > 0.0f) {
+				
+				mu.pushMatrix(gmu::MODEL);
+				mu.translate(gmu::MODEL, particles[i].x, particles[i].y, particles[i].z);
+				mu.scale(gmu::MODEL, 0.05f, 0.05f, 0.05f); 
+
+				mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+				mu.computeNormalMatrix3x3();
+				data.vm = mu.get(gmu::VIEW_MODEL);
+				data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+				data.normal = mu.getNormalMatrix();
+
+				renderer.renderMesh(data);
+
+				mu.popMatrix(gmu::MODEL);
+			} else {
+				dead_num_particles++;
+			}
+		}
+
+		glDepthMask(GL_TRUE);
+		glDisable(GL_BLEND);
+
+		if (dead_num_particles == 1500) {
+			fireworks = 0;
+			dead_num_particles = 0;
+			printf("All particles dead\n");
+		}
+
+	}
+
 
 	// --- Draw bulb ---
 	glDepthMask(GL_FALSE);
@@ -1452,6 +1534,39 @@ void mouseWheel(int wheel, int direction, int x, int y)
 // Scene building with basic geometry
 //
 
+void iniParticles(void)
+{
+    GLfloat v, theta, phi;
+    int i;
+
+    for (i = 0; i < 1500; i++)
+    {
+        float rv1 = (float)rand() / RAND_MAX;
+        float rv2 = (float)rand() / RAND_MAX;
+        float rv3 = (float)rand() / RAND_MAX;
+
+        v = 0.8f * rv1 + 0.2f;
+        phi = rv2 * M_PI;
+        theta = rv3 * 2.0f * M_PI;
+
+        particles[i].x = drone.position[0];
+        particles[i].y = drone.position[1];
+        particles[i].z = drone.position[2];
+		printf("Particle %d position: (%.2f, %.2f, %.2f)\n", i, particles[i].x, particles[i].y, particles[i].z);
+
+        particles[i].vx = v * cosf(theta) * sinf(phi);
+        particles[i].vy = v * cosf(phi);
+        particles[i].vz = v * sinf(theta) * sinf(phi);
+
+        particles[i].ax = 0.1f;
+        particles[i].ay = -0.15f;
+        particles[i].az = 0.0f;
+
+        particles[i].life = 1.0f;
+        particles[i].fade = 0.0025f;
+    }
+}
+
 void buildScene()
 {
 	// Texture Object definition
@@ -1485,6 +1600,11 @@ void buildScene()
 	float specMotor[] = {0.2f, 0.2f, 0.2f, 1.0f};
 	float emisMotor[] = {0.0f, 0.0f, 0.0f, 1.0f};
 
+	float ambFireworks[]  = { 0.3f, 0.1f, 0.0f, 1.0f };   
+	float diffFireworks[] = { 0.9f, 0.3f, 0.0f, 1.0f }; 
+	float specFireworks[] = { 0.9f, 0.9f, 0.9f, 1.0f };
+	float shininessFireworks   = 10.0f;
+
 	float emissive[] = {0.0f, 0.0f, 0.0f, 1.0f};
 	float shininess = 100.0f;
 	int texcount = 0;
@@ -1515,6 +1635,15 @@ void buildScene()
 	memcpy(allMeshes.sphere.mat.emissive, emisBulb, 4 * sizeof(float));
 	allMeshes.sphere.mat.shininess = shininess;
 	allMeshes.sphere.mat.texCount = texcount;
+
+	amesh = createSphere(1.0f, 20);
+	memcpy(amesh.mat.ambient, ambFireworks, 4 * sizeof(float));
+	memcpy(amesh.mat.diffuse, diffFireworks, 4 * sizeof(float));
+	memcpy(amesh.mat.specular, specFireworks, 4 * sizeof(float));
+	memcpy(amesh.mat.emissive, emissive, 4 * sizeof(float));
+	amesh.mat.shininess = shininessFireworks;
+	amesh.mat.texCount = texcount;
+	renderer.myMeshes.push_back(amesh);
 
 	// Cone
 	allMeshes.cone = createCone(2.0f, 1.0f, 20);
