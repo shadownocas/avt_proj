@@ -1459,7 +1459,8 @@ void renderSim(void)
 	glEnable(GL_BLEND);  
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glGetIntegerv(GL_VIEWPORT, m_viewport);
+	int m_viewport1[4];
+	glGetIntegerv(GL_VIEWPORT, m_viewport1);
 
 	// Save current matrices
 	mu.pushMatrix(gmu::MODEL);
@@ -1470,8 +1471,8 @@ void renderSim(void)
 	mu.loadIdentity(gmu::MODEL);
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::PROJECTION);
-	mu.ortho(m_viewport[0], m_viewport[0] + m_viewport[2] - 1, 
-			m_viewport[1], m_viewport[1] + m_viewport[3] - 1, -1, 1);
+	mu.ortho(m_viewport1[0], m_viewport1[0] + m_viewport1[2] - 1, 
+			m_viewport1[1], m_viewport1[1] + m_viewport1[3] - 1, -1, 1);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
 	if (!pause && !gameOver) {
@@ -1495,7 +1496,7 @@ void renderSim(void)
 
 		// Render points
 		std::string pointsStr = "Points: " + std::to_string(finalScore);
-		position = { static_cast<float>(m_viewport[2]) - 300, 120 };
+		position = { static_cast<float>(m_viewport1[2]) - 300, 120 };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(pointsStr, position.data(), color.data(), 0.5f);
 
@@ -1503,36 +1504,36 @@ void renderSim(void)
 
 	if (gameWin) {
 		std::string gameOverStr = "YOU WON!";
-		position = { m_viewport[2] - m_viewport[2] * 0.70f,  m_viewport[3] - m_viewport[3] * 0.6f };
+		position = { m_viewport1[2] - m_viewport1[2] * 0.70f,  m_viewport1[3] - m_viewport1[3] * 0.6f };
 		color = { 1.0f, 0.0f, 0.0f, 1.0f };
 		renderText(gameOverStr, position.data(), color.data(), 2.0f);
 
 		std::string pointsStr = "Points: " + std::to_string(finalScore);
-		position = { m_viewport[2] - m_viewport[2] * 0.58f,  m_viewport[3] - m_viewport[3] * 0.7f };
+		position = { m_viewport1[2] - m_viewport1[2] * 0.58f,  m_viewport1[3] - m_viewport1[3] * 0.7f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(pointsStr, position.data(), color.data(), 1.0f);
 	}
 
 	if (gameOver) {
 		std::string gameOverStr = "GAME OVER";
-		position = { m_viewport[2] - m_viewport[2] * 0.80f,  m_viewport[3] - m_viewport[3] * 0.6f };
+		position = { m_viewport1[2] - m_viewport1[2] * 0.80f,  m_viewport1[3] - m_viewport1[3] * 0.6f };
 		color = { 1.0f, 0.0f, 0.0f, 1.0f };
 		renderText(gameOverStr, position.data(), color.data(), 2.0f);
 	}
 
 	if (pause && !gameOver && !gameWin) {
 		std::string pauseStr = "PAUSE";
-		position = { m_viewport[2] - m_viewport[2] * 0.60f,  m_viewport[3] - m_viewport[3] * 0.6f };
+		position = { m_viewport1[2] - m_viewport1[2] * 0.60f,  m_viewport1[3] - m_viewport1[3] * 0.6f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(pauseStr, position.data(), color.data(), 2.0f);
 
 		std::string resumeStr = "Press P to resume";
-		position = { m_viewport[2] - m_viewport[2] * 0.65f,   m_viewport[3] - m_viewport[3] * 0.5f };
+		position = { m_viewport1[2] - m_viewport1[2] * 0.65f,   m_viewport1[3] - m_viewport1[3] * 0.5f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(resumeStr, position.data(), color.data(), 1.0f);
 
 		std::string restartStr = "Press R to restart";
-		position = { m_viewport[2] - m_viewport[2] * 0.65f,   m_viewport[3] - m_viewport[3] * 0.6f };
+		position = { m_viewport1[2] - m_viewport1[2] * 0.65f,   m_viewport1[3] - m_viewport1[3] * 0.6f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(restartStr, position.data(), color.data(), 1.0f);
 	}
@@ -1955,6 +1956,12 @@ void buildScene()
 
 	//Load flare from file
 	loadFlareFile(&AVTflare, "flare.txt");
+
+	fontLoaded = renderer.truetypeInit(fontPathFile);
+	if (!fontLoaded)
+		cerr << "Fonts not loaded\n";
+	else 
+		cerr << "Fonts loaded\n";
 }
 
 // ------------------------------------------------------------
