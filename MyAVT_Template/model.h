@@ -37,7 +37,7 @@ struct MyMesh {
 struct MeshCollection {
     MyMesh quad;
     MyMesh cube;
-    MyMesh sphere;
+    MyMesh sphere[2];
     MyMesh cone;
 	MyMesh torus;
 };

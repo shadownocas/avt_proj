@@ -38,7 +38,9 @@ using namespace std;
 
 #define CAPTION "AVT 2025 Welcome Demo"
 #define LAMP_POST_NUMBER 6
-#define cimg_use_png
+#define frand()			((float)rand()/RAND_MAX)
+#define M_PI			3.14159265
+#define MAX_PARTICULAS  1500
 
 const string fontPathFile = "fonts/arial.ttf";
 bool fontLoaded = false;
@@ -375,6 +377,34 @@ AABB mergeAABBs(const AABB& a, const AABB& b) {
 // Render stufff
 //
 
+
+void iniParticles(void)
+{
+    float v, theta, phi;
+    int i;
+
+    for (i = 0; i < MAX_PARTICULAS; i++) {
+        v = 0.8f * frand() + 0.2f;
+        phi = frand() * M_PI;
+        theta = frand() * 2.0f * M_PI;
+
+        particles[i].x = drone.position[0];
+        particles[i].y = drone.position[1];
+        particles[i].z = drone.position[2];
+
+        particles[i].vx = v * cosf(theta) * sinf(phi);
+        particles[i].vy = v * cosf(phi);
+        particles[i].vz = v * sinf(theta) * sinf(phi);
+
+        particles[i].ax = 0.1f;
+        particles[i].ay = -0.15f;
+        particles[i].az = 0.0f;
+
+        particles[i].life = 1.0f;
+        particles[i].fade = 0.0025f;
+    }
+}
+
 void randomPackagePos(){
     int randomIndex = rand() % buildings.size();
     Building& chosen = buildings[randomIndex];
@@ -485,7 +515,7 @@ void updateParticles()
 	h = 0.033;
 	if (fireworks) {
 
-		for (i = 0; i < 1500; i++)
+		for (i = 0; i < MAX_PARTICULAS; i++)
 		{
 			particles[i].x += (h*particles[i].vx);
 			particles[i].y += (h*particles[i].vy);
@@ -743,6 +773,8 @@ bool collision(){
 	for (Building &b : buildings) {
 		if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, b.worldAABB.aabbmin, b.worldAABB.aabbmax)) {
 			printf("COLLISION with BUILDING object!");
+			fireworks = 1;
+			iniParticles();
 			collisionDetected = true;
 		}
 	}
@@ -1231,11 +1263,11 @@ void renderSim(void)
 
 
 		dataMesh data;
-		data.meshID = 3;
+		data.mesh = &allMeshes.sphere[1];
 		data.texMode = 9;
 
 
-		for (int i = 0; i < 1500; ++i) {
+		for (int i = 0; i < MAX_PARTICULAS; ++i) {
 			if (particles[i].life > 0.0f) {
 				
 				mu.pushMatrix(gmu::MODEL);
@@ -1259,7 +1291,7 @@ void renderSim(void)
 		glDepthMask(GL_TRUE);
 		glDisable(GL_BLEND);
 
-		if (dead_num_particles == 1500) {
+		if (dead_num_particles == MAX_PARTICULAS) {
 			fireworks = 0;
 			dead_num_particles = 0;
 			printf("All particles dead\n");
@@ -1277,7 +1309,7 @@ void renderSim(void)
         mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
         mu.computeNormalMatrix3x3();
 
-        data.mesh = &allMeshes.sphere;
+        data.mesh = &allMeshes.sphere[0];
         data.texMode = 2; // Transparency
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1534,39 +1566,6 @@ void mouseWheel(int wheel, int direction, int x, int y)
 // Scene building with basic geometry
 //
 
-void iniParticles(void)
-{
-    GLfloat v, theta, phi;
-    int i;
-
-    for (i = 0; i < 1500; i++)
-    {
-        float rv1 = (float)rand() / RAND_MAX;
-        float rv2 = (float)rand() / RAND_MAX;
-        float rv3 = (float)rand() / RAND_MAX;
-
-        v = 0.8f * rv1 + 0.2f;
-        phi = rv2 * M_PI;
-        theta = rv3 * 2.0f * M_PI;
-
-        particles[i].x = drone.position[0];
-        particles[i].y = drone.position[1];
-        particles[i].z = drone.position[2];
-		printf("Particle %d position: (%.2f, %.2f, %.2f)\n", i, particles[i].x, particles[i].y, particles[i].z);
-
-        particles[i].vx = v * cosf(theta) * sinf(phi);
-        particles[i].vy = v * cosf(phi);
-        particles[i].vz = v * sinf(theta) * sinf(phi);
-
-        particles[i].ax = 0.1f;
-        particles[i].ay = -0.15f;
-        particles[i].az = 0.0f;
-
-        particles[i].life = 1.0f;
-        particles[i].fade = 0.0025f;
-    }
-}
-
 void buildScene()
 {
 	// Texture Object definition
@@ -1628,22 +1627,21 @@ void buildScene()
 	allMeshes.cube.mat.texCount = texcount;
 
 	// Sphere
-	allMeshes.sphere = createSphere(1.0f, 16);
-	memcpy(allMeshes.sphere.mat.ambient, ambBulb, 4 * sizeof(float));
-	memcpy(allMeshes.sphere.mat.diffuse, diffBulb, 4 * sizeof(float));
-	memcpy(allMeshes.sphere.mat.specular, specBulb, 4 * sizeof(float));
-	memcpy(allMeshes.sphere.mat.emissive, emisBulb, 4 * sizeof(float));
-	allMeshes.sphere.mat.shininess = shininess;
-	allMeshes.sphere.mat.texCount = texcount;
+	allMeshes.sphere[0] = createSphere(1.0f, 16);
+	memcpy(allMeshes.sphere[0].mat.ambient, ambBulb, 4 * sizeof(float));
+	memcpy(allMeshes.sphere[0].mat.diffuse, diffBulb, 4 * sizeof(float));
+	memcpy(allMeshes.sphere[0].mat.specular, specBulb, 4 * sizeof(float));
+	memcpy(allMeshes.sphere[0].mat.emissive, emisBulb, 4 * sizeof(float));
+	allMeshes.sphere[0].mat.shininess = shininess;
+	allMeshes.sphere[0].mat.texCount = texcount;
 
-	amesh = createSphere(1.0f, 20);
-	memcpy(amesh.mat.ambient, ambFireworks, 4 * sizeof(float));
-	memcpy(amesh.mat.diffuse, diffFireworks, 4 * sizeof(float));
-	memcpy(amesh.mat.specular, specFireworks, 4 * sizeof(float));
-	memcpy(amesh.mat.emissive, emissive, 4 * sizeof(float));
-	amesh.mat.shininess = shininessFireworks;
-	amesh.mat.texCount = texcount;
-	renderer.myMeshes.push_back(amesh);
+	allMeshes.sphere[1] = createSphere(1.0f, 20);
+	memcpy(allMeshes.sphere[1].mat.ambient, ambFireworks, 4 * sizeof(float));
+	memcpy(allMeshes.sphere[1].mat.diffuse, diffFireworks, 4 * sizeof(float));
+	memcpy(allMeshes.sphere[1].mat.specular, specFireworks, 4 * sizeof(float));
+	memcpy(allMeshes.sphere[1].mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.sphere[1].mat.shininess = shininessFireworks;
+	allMeshes.sphere[1].mat.texCount = texcount;
 
 	// Cone
 	allMeshes.cone = createCone(2.0f, 1.0f, 20);
