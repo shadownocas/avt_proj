@@ -238,6 +238,9 @@
 
 				float DegToRad(float degrees);
 
+				double clamp(const double x, const double min, const double max);
+
+				int clampi(const int x, const int min, const int max);
 			
 			private:
 

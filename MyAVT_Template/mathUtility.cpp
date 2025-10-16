@@ -509,3 +509,11 @@ void gmu::shadow_matrix(float* m, float* plane, float* light)    //planar shadow
 	m[11] = -light[3] * plane[2];
 	m[15] = dot - light[3] * plane[3];
 }
+
+double gmu::clamp(const double x, const double min, const double max) {
+	return (x < min ? min : (x > max ? max : x));
+}
+
+int gmu::clampi(const int x, const int min, const int max) {
+	return (x < min ? min : (x > max ? max : x));
+}

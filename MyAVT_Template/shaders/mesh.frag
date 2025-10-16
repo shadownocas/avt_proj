@@ -49,6 +49,12 @@ uniform sampler2D texmap4;
 uniform sampler2D texmap5;  
 uniform sampler2D texmap6;
 uniform sampler2D texmap7;  
+uniform sampler2D texmap8;  
+uniform sampler2D texmap9;  
+uniform sampler2D texmap10;  
+uniform sampler2D texmap11;  
+uniform sampler2D texmap12;  
+
 
 // Directional light
 uniform vec3 dirLightDir;   
@@ -180,6 +186,34 @@ void main() {
         vec3 finalColor = max(intensity * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, texel.a);
     }
+    else if (texMode >= 8 && texMode <= 12) {
+        // --- Flare effect ---
+        // Choose flare texture based on texMode
+        if (texMode == 8)
+            texel = texture(texmap8, DataIn.tex_coord); // crcl
+        else if (texMode == 9)
+            texel = texture(texmap9, DataIn.tex_coord); // flar
+        else if (texMode == 10)
+            texel = texture(texmap10, DataIn.tex_coord); // hxgn
+        else if (texMode == 11)
+            texel = texture(texmap11, DataIn.tex_coord); // ring
+        else if (texMode == 12)
+            texel = texture(texmap12, DataIn.tex_coord); // sun
+        else
+            texel = vec4(1.0);
+
+        // Multiply texture by flare diffuse color
+        vec4 finalColor = texel * mat.diffuse;
+
+        // Discard nearly transparent pixels
+        //if (finalColor.a < 0.05)
+          //  discard;
+
+        // No lighting, just pure color — output directly
+        colorOut = finalColor;
+        return; // Skip fog and lighting
+    }
+
     else {
         texel = texture(texmap, DataIn.tex_coord);
         float stripeStart = 0.45;
