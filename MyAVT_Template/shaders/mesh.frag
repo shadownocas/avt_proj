@@ -202,20 +202,17 @@ void main() {
         else
             texel = vec4(1.0);
 
-        // Multiply texture by flare diffuse color
         vec4 finalColor = texel * mat.diffuse;
 
-        // Discard nearly transparent pixels
-        //if (finalColor.a < 0.05)
-          //  discard;
+        if (finalColor.a < 0.05)
+            discard;
 
-        // No lighting, just pure color — output directly
         colorOut = finalColor;
         return; // Skip fog and lighting
     }
     else if (texMode == 13) {
-        //texMode == 4 -> constant shading
-		colorOut = vec4(0.5, 0.5, 0.5, 1.0);
+        // Shadow: black color with slight transparency
+        colorOut = vec4(0.0, 0.0, 0.0, 0.5);
     }
 
     else {
