@@ -9,7 +9,7 @@
 // The code comes with no warranties, use it at your own risk.
 // You may use it, or parts of it, wherever you want.
 //
-// Author: Jo�o Madeiras Pereira
+// Author: Jo o Madeiras Pereira
 //
 
 #include <math.h>
@@ -1042,7 +1042,7 @@ void draw_floor(){
 	floorObj.worldAABB = aabbBox;
 
 	data.mesh = &allMeshes.quad;
-	data.texMode = shadowMode ? 13 : 14;
+	data.texMode = 14; //14 VETRTO  - 2
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
@@ -1196,28 +1196,10 @@ void drawSceneObjects(bool shadowMode){
 		mu.popMatrix(gmu::MODEL);
 	}
 
-	// --- Draw garden ---
-	{
-		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, gardenCenterX, 0.3f, gardenCenterZ);
-		mu.scale(gmu::MODEL, gardenW, 1.0f, gardenD);
-		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
-
-		data.mesh = &allMeshes.quad;
-		data.texMode = shadowMode ? 13 : 5;
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
-		mu.popMatrix(gmu::MODEL);
-	}
-
 	// --- Draw trees ---
 	for (Billboard &tree : billboards) {
         mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, tree.position[0], tree.position[1] + tree.scale[1] * 0.3, tree.position[2]);
+        mu.translate(gmu::MODEL, tree.position[0], tree.position[1] /* + tree.scale[1] * 0.3 */, tree.position[2]);
         mu.scale(gmu::MODEL, tree.scale[0], tree.scale[1], tree.scale[2]);
 
 		turnBillBoard(cams[2].camPos, tree.position);
@@ -1230,7 +1212,7 @@ void drawSceneObjects(bool shadowMode){
 		tree.worldAABB = aabbBox;
 
        	data.mesh = &allMeshes.quad;	
-		data.texMode = shadowMode ? 13 : tree.textureID;
+		data.texMode = tree.textureID;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1371,10 +1353,14 @@ void renderSim(void)
 {
 
 	FrameCount++;
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	/* glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_BLEND);*/
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+	glClearStencil(0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	renderer.activateRenderMeshesShaderProg();
 
@@ -1410,6 +1396,8 @@ void renderSim(void)
 	float dirLightEye3[3] = {dirLightEye[0], dirLightEye[1], dirLightEye[2]};
 	renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
 
+	glEnable(GL_DEPTH_TEST);
+
 	bool renderReflections = (cams[activeCam].camPos[1] > 0.0f); // above floor
     if(!renderReflections) return;
  
@@ -1421,7 +1409,7 @@ void renderSim(void)
 	draw_floor(); // render floor only for stencil
 
 	// Step 2: draw reflected scene where stencil == 1
-	glStencilFunc(GL_EQUAL, 1, 0x1);
+	glStencilFunc(GL_EQUAL, 0x1, 0x1);
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
 	glCullFace(GL_FRONT); // avoid z-fighting
@@ -1439,8 +1427,31 @@ void renderSim(void)
 
 	// Step 4: planar shadows
 	float shadowMat[16];
-	float floorPlane[4] = {0,1,0,0}; // y=0
-	float lightPosWorld[4] = {dirLightWorld[0], dirLightWorld[1], dirLightWorld[2], 1.0f};
+
+
+
+	float len = sqrtf(dirLightWorld[0]*dirLightWorld[0] +
+					dirLightWorld[1]*dirLightWorld[1] +
+					dirLightWorld[2]*dirLightWorld[2]);
+	for (int i = 0; i < 3; ++i)
+		dirLightWorld[i] /= len;
+
+	// Fake point light position along opposite direction
+	float lightHeight = 100.0f;
+	float lightPosWorld[4] = {
+		-dirLightWorld[0] * lightHeight,
+		-dirLightWorld[1] * lightHeight,
+		-dirLightWorld[2] * lightHeight,
+		1.0f
+	};
+
+	lightPosWorld[0] += -50.0f; // move left
+	lightPosWorld[1] += 50.0f;   // move up to top
+	//lightPosWorld[2] += 100.0f;  // move away
+
+	// Floor plane y = 0
+	float floorPlane[4] = {0, 1, 0, 0};
+
 	mu.shadow_matrix(shadowMat, floorPlane, lightPosWorld);
 
 	glDisable(GL_DEPTH_TEST); 
@@ -1450,12 +1461,12 @@ void renderSim(void)
 	mu.pushMatrix(gmu::MODEL);
 	mu.multMatrix(gmu::MODEL, shadowMat);
 	drawSceneObjects(true); // shadowMode = true
-	mu.popMatrix(gmu::MODEL);
+	mu.popMatrix(gmu::MODEL); 
 
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_STENCIL_TEST);
 
-
+	drawSceneObjects(false);
 
 	// ----- RENDER PARTICLES -----
 	if(fireworks){
@@ -1601,7 +1612,6 @@ void renderSim(void)
 
 	glutSwapBuffers();
 }
-
 
 
 // ------------------------------------------------------------
@@ -1964,7 +1974,7 @@ void buildScene()
 
         Billboard tree;
         tree.position[0] = rx;
-        tree.position[1] = 0.0f;
+        tree.position[1] = 10.0f;
         tree.position[2] = rz;
 
         tree.scale[0] = 20.0f;

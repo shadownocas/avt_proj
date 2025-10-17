@@ -213,24 +213,49 @@ void main() {
         colorOut = finalColor;
         return; // Skip fog and lighting
     }
+    else if (texMode == 13) {
+        //texMode == 4 -> constant shading
+		colorOut = vec4(0.5, 0.5, 0.5, 1.0);
+    }
 
     else {
-        texel = texture(texmap, DataIn.tex_coord);
-        float stripeStart = 0.45;
-        float stripeEnd   = 0.6;
+        texel = texture(texmap, DataIn.tex_coord); // base floor
+        vec3 finalTexture = texel.rgb;
 
-        vec3 finalTexture;
-        if (DataIn.tex_coord.x > stripeStart && DataIn.tex_coord.x < stripeEnd) {
-            float stripeU = (DataIn.tex_coord.x - stripeStart) / (stripeEnd - stripeStart);
-            vec2 stripeUV = vec2(stripeU, DataIn.tex_coord.y);
+        // --- Garden overlay first ---
+        float gardenCenterX = 105.0f;
+        float gardenCenterZ = 95.0f;
+        float gardenW = 70.0f;
+        float gardenD = 70.0f;
+        // Compute garden UVs in floor-space
+        float gardenStartU = (gardenCenterX - gardenW/2.0) /200;   // floorWidth = total floor size in X
+        float gardenEndU   = (gardenCenterX + gardenW/2.0) /200 ;
 
-            texel1 = texture(texmap6, stripeUV);
-            finalTexture = texel1.rgb;
-        } 
-        else {
-            finalTexture = texel.rgb;
+        float gardenStartV = (gardenCenterZ - gardenD/2.0) /200;  // floorDepth = total floor size in Z
+        float gardenEndV   = (gardenCenterZ + gardenD/2.0) /200 ;
+
+        if (DataIn.tex_coord.x > gardenStartU && DataIn.tex_coord.x < gardenEndU &&
+            DataIn.tex_coord.y > gardenStartV && DataIn.tex_coord.y < gardenEndV) {
+
+            vec2 gardenUV;
+            gardenUV.x = (DataIn.tex_coord.x - gardenStartU) / (gardenEndU - gardenStartU);
+            gardenUV.y = (DataIn.tex_coord.y - gardenStartV) / (gardenEndV - gardenStartV);
+
+            finalTexture = texture(texmap5, gardenUV).rgb;
+
+        } else {
+            // stripe logic
+            float stripeStart = 0.45;
+            float stripeEnd   = 0.6;
+
+            if (DataIn.tex_coord.x > stripeStart && DataIn.tex_coord.x < stripeEnd) {
+                float stripeU = (DataIn.tex_coord.x - stripeStart) / (stripeEnd - stripeStart);
+                vec2 stripeUV = vec2(stripeU, DataIn.tex_coord.y);
+                finalTexture = texture(texmap6, stripeUV).rgb;
+            }
         }
-        vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb * texel1.rgb);
+        // combine with lighting/specular
+        vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
     }
     
