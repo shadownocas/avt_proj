@@ -272,6 +272,9 @@ FLARE_DEF AVTflare;
 bool flareEffect = false;
 float lightScreenPos[3];  //Position of the light in Window Coordinates
 
+//Shadow effect
+bool shadowMode = false;
+
 /// ::::::::::::::::::::::::::::::::::::::::::::::::CALLBACK FUNCIONS:::::::::::::::::::::::::::::::::::::::::::::::::://///
 
 void timer(int value)
@@ -1025,52 +1028,29 @@ void renderLampFlare(const LampPost &lamp, bool flareEffect, int *m_viewport) {
     mu.popMatrix(gmu::PROJECTION);
 }
 
+void draw_floor(){
+	dataMesh data;
 
-void renderSim(void)
-{
+	mu.pushMatrix(gmu::MODEL);
+	mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
+	mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
+	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+	mu.computeNormalMatrix3x3();
 
-	FrameCount++;
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	float* modelMatrix = mu.get(gmu::MODEL);
+	AABB aabbBox = updateGlobalAABB(floorObj.aabb, modelMatrix);
+	floorObj.worldAABB = aabbBox;
 
-	renderer.activateRenderMeshesShaderProg();
+	data.mesh = &allMeshes.quad;
+	data.texMode = shadowMode ? 13 : 14;
+	data.vm = mu.get(gmu::VIEW_MODEL);
+	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+	data.normal = mu.getNormalMatrix();
+	renderer.renderMesh(data);
+	mu.popMatrix(gmu::MODEL);
+}
 
-	renderer.setFog(gFogOn, gFogColor, gFogStart, gFogEnd);
-
-	update();
-
-	renderer.setTexUnit(0, 0);
-	renderer.setTexUnit(1, 1);
-	renderer.setTexUnit(2, 2);
-	renderer.setTexUnit(3, 3);
-	renderer.setTexUnit(4, 4);
-	renderer.setTexUnit(5, 5);
-	renderer.setTexUnit(6, 6);
-	renderer.setTexUnit(7, 7);
-	renderer.setTexUnit(8, 8);
-	renderer.setTexUnit(9, 9);
-	renderer.setTexUnit(10, 10);
-	renderer.setTexUnit(11, 11);
-	renderer.setTexUnit(12, 12);
-
-
-	mu.loadIdentity(gmu::VIEW);
-	mu.loadIdentity(gmu::MODEL);
-
-	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
-			  cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0, 1, 0);
-
-	// Directional light
-	{
-		float dirLightWorld[4] = {0.5f, -0.7f, 0.3f, 0.0f};
-		float dirLightEye[4];
-		mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
-		float dirLightEye3[3] = {dirLightEye[0], dirLightEye[1], dirLightEye[2]};
-		renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
-	}
-
+void drawSceneObjects(bool shadowMode){
 	dataMesh data;
 
 	//Headlight offsets
@@ -1136,33 +1116,12 @@ void renderSim(void)
 		obj.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
-		data.texMode = 1;
+		data.texMode = shadowMode ? 13 : 1;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
 		renderer.renderMesh(data);
 
-		mu.popMatrix(gmu::MODEL);
-	}
-
-	// --- Draw floor ---
-	{	
-		mu.pushMatrix(gmu::MODEL);
-		mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
-		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
-		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-		mu.computeNormalMatrix3x3();
-
-		float* modelMatrix = mu.get(gmu::MODEL);
-		AABB aabbBox = updateGlobalAABB(floorObj.aabb, modelMatrix);
-		floorObj.worldAABB = aabbBox;
-
-		data.mesh = &allMeshes.quad;
-		data.texMode = 13; // Multiple texturing
-		data.vm = mu.get(gmu::VIEW_MODEL);
-		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-		data.normal = mu.getNormalMatrix();
-		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
 	}
 
@@ -1197,7 +1156,7 @@ void renderSim(void)
 		}
 
 		data.mesh = &allMeshes.cube;
-		data.texMode = 4;
+		data.texMode = shadowMode ? 13 : 4;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -1225,7 +1184,7 @@ void renderSim(void)
 			mu.computeNormalMatrix3x3();
 
 			data.mesh = &allMeshes.torus;
-			data.texMode = 4;
+			data.texMode = shadowMode ? 13 : 4;
 			data.vm = mu.get(gmu::VIEW_MODEL);
 			data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 			data.normal = mu.getNormalMatrix();
@@ -1245,8 +1204,9 @@ void renderSim(void)
 		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
+
 		data.mesh = &allMeshes.quad;
-		data.texMode = 5;
+		data.texMode = shadowMode ? 13 : 5;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -1270,7 +1230,7 @@ void renderSim(void)
 		tree.worldAABB = aabbBox;
 
        	data.mesh = &allMeshes.quad;	
-		data.texMode = tree.textureID;
+		data.texMode = shadowMode ? 13 : tree.textureID;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1294,7 +1254,7 @@ void renderSim(void)
 		b.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
-		data.texMode = b.goal? 4 : 3;
+		data.texMode = shadowMode ? 13 : (b.goal ? 4 : 3);
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -1315,7 +1275,7 @@ void renderSim(void)
         mu.computeNormalMatrix3x3();
 
         data.mesh = &allMeshes.sphere[0];
-        data.texMode = 2; // Transparency
+        data.texMode = shadowMode ? 13 : 2;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1360,7 +1320,7 @@ void renderSim(void)
 		lamp.worldAABB = aabbBox;
 
         data.mesh = &allMeshes.cube;
-        data.texMode = 4;
+		data.texMode = shadowMode ? 13 : 4;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
@@ -1395,7 +1355,7 @@ void renderSim(void)
 		package.worldAABB = aabbBox;
 
 		data.mesh = &allMeshes.cube;
-		data.texMode = 4;
+		data.texMode = shadowMode ? 13 : 4;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -1403,6 +1363,99 @@ void renderSim(void)
 		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
 	}
+
+}
+
+
+void renderSim(void)
+{
+
+	FrameCount++;
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	renderer.activateRenderMeshesShaderProg();
+
+	renderer.setFog(gFogOn, gFogColor, gFogStart, gFogEnd);
+
+	update();
+
+	renderer.setTexUnit(0, 0);
+	renderer.setTexUnit(1, 1);
+	renderer.setTexUnit(2, 2);
+	renderer.setTexUnit(3, 3);
+	renderer.setTexUnit(4, 4);
+	renderer.setTexUnit(5, 5);
+	renderer.setTexUnit(6, 6);
+	renderer.setTexUnit(7, 7);
+	renderer.setTexUnit(8, 8);
+	renderer.setTexUnit(9, 9);
+	renderer.setTexUnit(10, 10);
+	renderer.setTexUnit(11, 11);
+	renderer.setTexUnit(12, 12);
+
+
+	mu.loadIdentity(gmu::VIEW);
+	mu.loadIdentity(gmu::MODEL);
+
+	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
+			  cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2], 0, 1, 0);
+
+	// Directional light
+	float dirLightWorld[4] = {0.5f, -0.7f, 0.3f, 0.0f};
+	float dirLightEye[4];
+	mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
+	float dirLightEye3[3] = {dirLightEye[0], dirLightEye[1], dirLightEye[2]};
+	renderer.setDirectionalLight(dirLightEye3, dayMode ? dirLightColor : nightLightColor);
+
+	bool renderReflections = (cams[activeCam].camPos[1] > 0.0f); // above floor
+    if(!renderReflections) return;
+ 
+	glEnable(GL_STENCIL_TEST);
+
+	// Step 1: draw floor into stencil (no color)
+	glStencilFunc(GL_NEVER, 1, 0x1);
+	glStencilOp(GL_REPLACE, GL_KEEP, GL_KEEP);
+	draw_floor(); // render floor only for stencil
+
+	// Step 2: draw reflected scene where stencil == 1
+	glStencilFunc(GL_EQUAL, 1, 0x1);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+	glCullFace(GL_FRONT); // avoid z-fighting
+	mu.pushMatrix(gmu::MODEL);
+	mu.scale(gmu::MODEL, 1.0f, -1.0f, 1.0f); // mirror over floor
+	drawSceneObjects(false); // all drones, flying objects, trees, buildings, package
+	mu.popMatrix(gmu::MODEL);
+	glCullFace(GL_BACK);
+
+	// Step 3: blend floor over reflection for specular
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	draw_floor();
+	glDisable(GL_BLEND);
+
+	// Step 4: planar shadows
+	float shadowMat[16];
+	float floorPlane[4] = {0,1,0,0}; // y=0
+	float lightPosWorld[4] = {dirLightWorld[0], dirLightWorld[1], dirLightWorld[2], 1.0f};
+	mu.shadow_matrix(shadowMat, floorPlane, lightPosWorld);
+
+	glDisable(GL_DEPTH_TEST); 
+	glBlendFunc(GL_DST_COLOR, GL_ZERO); // darken floor
+	glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
+
+	mu.pushMatrix(gmu::MODEL);
+	mu.multMatrix(gmu::MODEL, shadowMat);
+	drawSceneObjects(true); // shadowMode = true
+	mu.popMatrix(gmu::MODEL);
+
+	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_STENCIL_TEST);
+
+
 
 	// ----- RENDER PARTICLES -----
 	if(fireworks){
