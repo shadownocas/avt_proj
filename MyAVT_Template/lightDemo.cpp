@@ -944,24 +944,8 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
     int dx = mu.clampi(cx + (cx - lx), m_viewport[0], screenMaxX);
     int dy = mu.clampi(cy + (cy - ly), m_viewport[1], screenMaxY);
 
-    // --- Dynamically allocate index array ---
-    int* indices = new int[flare->nPieces];
-    for (int i = 0; i < flare->nPieces; ++i) indices[i] = i;
-
-    // --- Simple bubble sort by fDistance descending ---
-    for (int i = 0; i < flare->nPieces - 1; ++i) {
-        for (int j = i + 1; j < flare->nPieces; ++j) {
-            if (flare->element[indices[i]].fDistance < flare->element[indices[j]].fDistance) {
-                int tmp = indices[i];
-                indices[i] = indices[j];
-                indices[j] = tmp;
-            }
-        }
-    }
-
-    // --- Draw flares in sorted order ---
     for (int i = 0; i < flare->nPieces; ++i) {
-		int idx = indices[i];
+		int idx = i;
 
 		int px = (int)((1.0f - flare->element[idx].fDistance) * lx + flare->element[idx].fDistance * dx);
 		int py = (int)((1.0f - flare->element[idx].fDistance) * ly + flare->element[idx].fDistance * dy);
@@ -975,7 +959,6 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
 		mu.pushMatrix(gmu::MODEL);
 		mu.loadIdentity(gmu::MODEL);
 
-		// add tiny Z offset based on flare order
 		float z = 0.0f + 0.001f * i; 
 		mu.translate(gmu::MODEL, float(px), float(py), z);
 		mu.scale(gmu::MODEL, float(width), float(width), 1.0f);
@@ -991,16 +974,14 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
 
 		mu.popMatrix(gmu::MODEL);
 	}
-
-
-    delete[] indices; // free memory
 }
 
 
-void renderLampFlare(const LampPost &lamp, bool flareEffect, int *m_viewport) {
+void renderLampFlare(bool flareEffect, int *m_viewport) {
     if (!flareEffect) return;
 
-    float lightPos[4] = { lamp.position[0], lamp.height, lamp.position[2], 1.0f };
+    float lightPos[4] = { -200, 200, 200, 1.0f };
+
     float lightScreenPos[3];
     int flarePos[2];
 
@@ -1272,9 +1253,6 @@ void drawSceneObjects(bool shadowMode){
 	}
 	glDepthMask(GL_TRUE);
 
-	int m_viewport[4];
-	glGetIntegerv(GL_VIEWPORT, m_viewport);
-	int i = 0;
 	// --- Draw lamp post ---
 	for (LampPost &lamp : lampPosts) {
         float lx = lamp.position[0];
@@ -1315,12 +1293,12 @@ void drawSceneObjects(bool shadowMode){
         renderer.renderMesh(data);
         mu.popMatrix(gmu::MODEL);
 
-		//renderLampFlare(lamp, flareEffect && !spotlight_mode, m_viewport);
-		if (i == 0 ) renderLampFlare(lamp, true, m_viewport);
-		i ++;
-
     }
 	renderer.setLampLights(pointLights, lampsOn);
+
+	int m_viewport[4];
+	glGetIntegerv(GL_VIEWPORT, m_viewport);
+	renderLampFlare(true, m_viewport);
 
 	// --- Draw package ---
 	{ 
