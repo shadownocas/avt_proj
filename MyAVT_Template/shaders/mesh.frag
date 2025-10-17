@@ -54,7 +54,7 @@ uniform sampler2D texmap9;
 uniform sampler2D texmap10;  
 uniform sampler2D texmap11;  
 uniform sampler2D texmap12;  
-
+uniform sampler2D texmap13;  
 
 // Directional light
 uniform vec3 dirLightDir;   
@@ -219,29 +219,67 @@ void main() {
         texel = texture(texmap, DataIn.tex_coord); // base floor
         vec3 finalTexture = texel.rgb;
 
-        // --- Garden overlay first ---
-        float gardenCenterX = 105.0f;
-        float gardenCenterZ = 95.0f;
-        float gardenW = 70.0f;
-        float gardenD = 70.0f;
-        // Compute garden UVs in floor-space
-        float gardenStartU = (gardenCenterX - gardenW/2.0) /200;   // floorWidth = total floor size in X
-        float gardenEndU   = (gardenCenterX + gardenW/2.0) /200 ;
+        // combine with lighting/specular
+        vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
 
-        float gardenStartV = (gardenCenterZ - gardenD/2.0) /200;  // floorDepth = total floor size in Z
-        float gardenEndV   = (gardenCenterZ + gardenD/2.0) /200 ;
+        // --- Garden overlay ---
+        float gardenCenterX = 105.0;
+        float gardenCenterZ = 95.0;
+        float gardenW = 70.0;
+        float gardenD = 70.0;
 
-        if (DataIn.tex_coord.x > gardenStartU && DataIn.tex_coord.x < gardenEndU &&
-            DataIn.tex_coord.y > gardenStartV && DataIn.tex_coord.y < gardenEndV) {
+        // --- Lake overlay ---
+        float lakeCenterX = 20.0;
+        float lakeCenterZ = 95.0;
+        float lakeW = 60.0;
+        float lakeD = 40.0;
 
+        float floorWidth = 200.0;
+        float floorDepth = 200.0;
+
+        // --- Compute garden bounds ---
+        float gardenStartU = (gardenCenterX - gardenW/2.0) / floorWidth;
+        float gardenEndU   = (gardenCenterX + gardenW/2.0) / floorWidth;
+        float gardenStartV = (gardenCenterZ - gardenD/2.0) / floorDepth;
+        float gardenEndV   = (gardenCenterZ + gardenD/2.0) / floorDepth;
+
+        // --- Compute lake bounds ---
+        float lakeStartU = (lakeCenterX - lakeW/2.0) / floorWidth;
+        float lakeEndU   = (lakeCenterX + lakeW/2.0) / floorWidth;
+        float lakeStartV = (lakeCenterZ - lakeD/2.0) / floorDepth;
+        float lakeEndV   = (lakeCenterZ + lakeD/2.0) / floorDepth;
+
+        // --- Priority order: lake > garden > road stripe ---
+        if (DataIn.tex_coord.x > lakeStartU && DataIn.tex_coord.x < lakeEndU &&
+            DataIn.tex_coord.y > lakeStartV && DataIn.tex_coord.y < lakeEndV) {
+
+            // Lake region
+            vec2 lakeUV;
+            lakeUV.x = (DataIn.tex_coord.x - lakeStartU) / (lakeEndU - lakeStartU);
+            lakeUV.y = (DataIn.tex_coord.y - lakeStartV) / (lakeEndV - lakeStartV);
+
+            vec4 lakeTex = texture(texmap13, lakeUV);
+            float lakeAlpha = 0.6;
+
+            vec3 finalColor = max(intensity * lakeTex.rgb + spec.rgb, 0.07 * lakeTex.rgb);
+            colorOut = vec4(finalColor, lakeAlpha);
+
+        } else if (DataIn.tex_coord.x > gardenStartU && DataIn.tex_coord.x < gardenEndU &&
+                DataIn.tex_coord.y > gardenStartV && DataIn.tex_coord.y < gardenEndV) {
+
+            // Garden region
             vec2 gardenUV;
             gardenUV.x = (DataIn.tex_coord.x - gardenStartU) / (gardenEndU - gardenStartU);
             gardenUV.y = (DataIn.tex_coord.y - gardenStartV) / (gardenEndV - gardenStartV);
 
             finalTexture = texture(texmap5, gardenUV).rgb;
 
+            vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
+            colorOut = vec4(finalColor, 1.0);
+
         } else {
-            // stripe logic
+            // Road stripe logic
             float stripeStart = 0.45;
             float stripeEnd   = 0.6;
 
@@ -249,11 +287,11 @@ void main() {
                 float stripeU = (DataIn.tex_coord.x - stripeStart) / (stripeEnd - stripeStart);
                 vec2 stripeUV = vec2(stripeU, DataIn.tex_coord.y);
                 finalTexture = texture(texmap6, stripeUV).rgb;
+
+                vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
+                colorOut = vec4(finalColor, 1.0);
             }
         }
-        // combine with lighting/specular
-        vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
-        colorOut = vec4(finalColor, 1.0);
     }
     
     // Fog

@@ -1387,7 +1387,7 @@ void renderSim(void)
 	renderer.setTexUnit(10, 10);
 	renderer.setTexUnit(11, 11);
 	renderer.setTexUnit(12, 12);
-
+	renderer.setTexUnit(13, 13);
 
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::MODEL);
@@ -1796,6 +1796,10 @@ void buildScene()
 	renderer.TexObjArray.texture2D_Loader("assets/hxgn.tga");  // 10
 	renderer.TexObjArray.texture2D_Loader("assets/ring.tga");  // 11
 	renderer.TexObjArray.texture2D_Loader("assets/sun.tga");   // 12
+
+	renderer.TexObjArray.texture2D_Loader("assets/water.tga");   // 12
+
+	
 
 	// Scene geometry with triangle meshes
 	MyMesh amesh;
