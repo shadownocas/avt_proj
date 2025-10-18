@@ -14,15 +14,13 @@ in vec4 normal;    // from geometry generator
 in vec4 texCoord;
 
 // Output to fragment shader
-out Data {
-    vec3 normal;    // normal in eye space
-    vec3 eye;       // vector toward camera (eye space)
-    vec3 posEye;    // position in eye space
-    vec2 tex_coord; // texture coordinates
-    vec3 skyboxTexCoord;
-    vec3 eyeDir;
-    vec3 reflectedDir;
-} DataOut;
+out vec3 normal1;       // normal in eye space
+out vec3 eye;          // vector toward camera (eye space)
+out vec3 posEye;       // position in eye space
+out vec2 tex_coord;    // texture coordinates
+out vec3 skyboxTexCoord;
+out vec3 eyeDir;
+out vec3 reflectedDir;
 
 void main() {
     // Transform vertex position to eye space
@@ -30,29 +28,29 @@ void main() {
 
     // Eye vector in eye space
     vec3 eyeDir1 = -posEye4.xyz;
-    DataOut.eyeDir = eyeDir1;
+    eyeDir = eyeDir1;
 
     // Output eye-space position
-    DataOut.posEye = posEye4.xyz;
+    posEye = posEye4.xyz;
 
     // Transform normal to eye space
-    DataOut.normal = normalize(m_normal * normal.xyz);
+    normal1 = normalize(m_normal * normal.xyz);
 
     // Compute vector toward camera (eye-space)
     // Eye is at origin in eye space, so vector = -posEye
-    DataOut.eye = normalize(-posEye4.xyz);
+    eye = normalize(-posEye4.xyz);
 
     // Pass through texture coordinates
-    DataOut.tex_coord = texCoord.st;
+    tex_coord = texCoord.st;
 
     // Compute clip-space position for rasterization
     gl_Position = m_pvm * position;
 
-    DataOut.skyboxTexCoord = vec3(m_Model * position); // since translation is canceled, this works
-    DataOut.skyboxTexCoord.x = -DataOut.skyboxTexCoord.x; // if needed to fix orientation
+    skyboxTexCoord = vec3(m_Model * position); // since translation is canceled, this works
+    skyboxTexCoord.x = -skyboxTexCoord.x; // if needed to fix orientation
 
     if (texMode == 15) {
-        DataOut.reflectedDir = vec3(transpose(m_View) * vec4(vec3(reflect(-DataOut.eyeDir, DataOut.normal)), 0.0)); //reflection vector in world coord
-        DataOut.reflectedDir.x= - DataOut.reflectedDir.x;
+        reflectedDir = vec3(transpose(m_View) * vec4(vec3(reflect(-eyeDir, normal1)), 0.0)); //reflection vector in world coord
+        reflectedDir.x= - reflectedDir.x;
     }
 }

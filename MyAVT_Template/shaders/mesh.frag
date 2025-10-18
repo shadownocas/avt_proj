@@ -30,18 +30,17 @@ struct SpotLight {
     vec3 Color;
 };
 
-in Data {
-    vec3 normal;
-    vec3 eye;       // vector toward camera
-    vec3 posEye;    // position in eye space
-    vec2 tex_coord;
-    vec3 skyboxTexCoord;
-    vec3 eyeDir;
-    vec3 reflectedDir;
-} DataIn;
+in vec3 normal1;       // normal in eye space
+in vec3 eye;          // vector toward camera (eye space)
+in vec3 posEye;       // position in eye space
+in vec2 tex_coord;    // texture coordinates
+in vec3 skyboxTexCoord;
+in vec3 eyeDir;
+in vec3 reflectedDir;
 
 uniform Materials mat;
 uniform float alpha_threshold;  // for transparency cutoff
+const float reflect_factor = 0.9;
 
 // Texture samplers
 uniform sampler2D texmap;   
@@ -123,8 +122,8 @@ vec3 calcSpotLight(SpotLight light, vec3 Normal, vec3 View, vec3 posEye) {
 
 
 void main() {
-    vec3 N = normalize(DataIn.normal);
-    vec3 V = normalize(DataIn.eye); // eye-space view vector
+    vec3 N = normalize(normal1);
+    vec3 V = normalize(eye); // eye-space view vector
     vec3 intensity = mat.ambient.rgb; // start with ambient
 
     // --- Directional light ---
@@ -134,13 +133,13 @@ void main() {
     // --- Point lights ---
     if (lampsOn) {
         for (int i = 0; i < numLamps; ++i) {
-            intensity += calcPointLight(pointLights[i], N, V, DataIn.posEye);
+            intensity += calcPointLight(pointLights[i], N, V, posEye);
         }
     }
 
 	if (spotlightsOn) {
 		for (int i = 0; i < 2; ++i) {
-			intensity += calcSpotLight(spotLights[i], N, V, DataIn.posEye);
+			intensity += calcSpotLight(spotLights[i], N, V, posEye);
 		}
 	}
 
@@ -151,12 +150,12 @@ void main() {
     if (texMode == 0)
         colorOut = vec4(max(intensity * mat.diffuse.rgb + spec.rgb, mat.ambient.rgb), 1.0);
     else if (texMode == 1) {
-        texel = texture(texmap2, DataIn.tex_coord);
+        texel = texture(texmap2, tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
     }
     else if (texMode == 2) {
-        texel = texture(texmap, DataIn.tex_coord);
+        texel = texture(texmap, tex_coord);
         if (texel.a <= alpha_threshold)
             discard;
         vec3 finalColor = max(intensity * texel.rgb + spec.rgb, 0.07 * texel.rgb);
@@ -164,27 +163,27 @@ void main() {
     }
 
     else if (texMode == 3) {
-        texel = texture(texmap3, DataIn.tex_coord);
+        texel = texture(texmap3, tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
     }
     else if (texMode == 4) {
-        texel = texture(texmap4, DataIn.tex_coord);
+        texel = texture(texmap4, tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
     }
     else if (texMode == 5) {
-        texel = texture(texmap5, DataIn.tex_coord);
+        texel = texture(texmap5, tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
     }
      else if (texMode == 6) {
-        texel = texture(texmap6, DataIn.tex_coord);
+        texel = texture(texmap6, tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
     }
     else if (texMode == 7){
-        texel = texture(texmap7, DataIn.tex_coord);
+        texel = texture(texmap7, tex_coord);
         if (texel.a <= alpha_threshold)
             discard;
         vec3 finalColor = max(intensity * texel.rgb + spec.rgb, 0.07 * texel.rgb);
@@ -194,15 +193,15 @@ void main() {
         // --- Flare effect ---
         // Choose flare texture based on texMode
         if (texMode == 8)
-            texel = texture(texmap8, DataIn.tex_coord); // crcl
+            texel = texture(texmap8, tex_coord); // crcl
         else if (texMode == 9)
-            texel = texture(texmap9, DataIn.tex_coord); // flar
+            texel = texture(texmap9, tex_coord); // flar
         else if (texMode == 10)
-            texel = texture(texmap10, DataIn.tex_coord); // hxgn
+            texel = texture(texmap10, tex_coord); // hxgn
         else if (texMode == 11)
-            texel = texture(texmap11, DataIn.tex_coord); // ring
+            texel = texture(texmap11, tex_coord); // ring
         else if (texMode == 12)
-            texel = texture(texmap12, DataIn.tex_coord); // sun
+            texel = texture(texmap12, tex_coord); // sun
         else
             texel = vec4(1.0);
 
@@ -219,11 +218,11 @@ void main() {
         colorOut = vec4(0.0, 0.0, 0.0, 0.5);
     }
     else if (texMode == 14) { //Skybox
-        vec3 cubeColor = texture(texmap14, DataIn.skyboxTexCoord).rgb;
+        vec3 cubeColor = texture(texmap14, skyboxTexCoord).rgb;
         colorOut = vec4(cubeColor, 1.0);
     }
     else if (texMode == 15) { // Environmental cube mapping
-		vec4 cube_texel = texture(texmap14, DataIn.reflectedDir); // interpolated reflected vector from vertex shader
+		vec4 cube_texel = texture(texmap14, reflectedDir); // interpolated reflected vector from vertex shader
 		vec3 intensity3 = vec3(intensity); // vec3 intensity
 		texel = texture(texmap4, tex_coord);  // texel from metal.tga
 		vec4 aux_color = mix(texel, cube_texel, reflect_factor);
@@ -233,7 +232,7 @@ void main() {
 		colorOut = vec4(final_rgb, 1.0);
 	}
     else {
-        texel = texture(texmap, DataIn.tex_coord); // base floor
+        texel = texture(texmap, tex_coord); // base floor
         vec3 finalTexture = texel.rgb;
 
         vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
@@ -267,13 +266,13 @@ void main() {
         float lakeEndV   = (lakeCenterZ + lakeD/2.0) / floorDepth;
 
         // --- Priority order: lake > garden > road stripe ---
-        if (DataIn.tex_coord.x > lakeStartU && DataIn.tex_coord.x < lakeEndU &&
-            DataIn.tex_coord.y > lakeStartV && DataIn.tex_coord.y < lakeEndV) {
+        if (tex_coord.x > lakeStartU && tex_coord.x < lakeEndU &&
+            tex_coord.y > lakeStartV && tex_coord.y < lakeEndV) {
 
             // Lake region
             vec2 lakeUV;
-            lakeUV.x = (DataIn.tex_coord.x - lakeStartU) / (lakeEndU - lakeStartU);
-            lakeUV.y = (DataIn.tex_coord.y - lakeStartV) / (lakeEndV - lakeStartV);
+            lakeUV.x = (tex_coord.x - lakeStartU) / (lakeEndU - lakeStartU);
+            lakeUV.y = (tex_coord.y - lakeStartV) / (lakeEndV - lakeStartV);
 
             vec4 lakeTex = texture(texmap13, lakeUV);
             float lakeAlpha = 0.6;
@@ -281,13 +280,13 @@ void main() {
             vec3 finalColor = max(intensity * lakeTex.rgb + spec.rgb, 0.07 * lakeTex.rgb);
             colorOut = vec4(finalColor, lakeAlpha);
 
-        } else if (DataIn.tex_coord.x > gardenStartU && DataIn.tex_coord.x < gardenEndU &&
-                DataIn.tex_coord.y > gardenStartV && DataIn.tex_coord.y < gardenEndV) {
+        } else if (tex_coord.x > gardenStartU && tex_coord.x < gardenEndU &&
+                tex_coord.y > gardenStartV && tex_coord.y < gardenEndV) {
 
             // Garden region
             vec2 gardenUV;
-            gardenUV.x = (DataIn.tex_coord.x - gardenStartU) / (gardenEndU - gardenStartU);
-            gardenUV.y = (DataIn.tex_coord.y - gardenStartV) / (gardenEndV - gardenStartV);
+            gardenUV.x = (tex_coord.x - gardenStartU) / (gardenEndU - gardenStartU);
+            gardenUV.y = (tex_coord.y - gardenStartV) / (gardenEndV - gardenStartV);
 
             finalTexture = texture(texmap5, gardenUV).rgb;
 
@@ -299,9 +298,9 @@ void main() {
             float stripeStart = 0.45;
             float stripeEnd   = 0.6;
 
-            if (DataIn.tex_coord.x > stripeStart && DataIn.tex_coord.x < stripeEnd) {
-                float stripeU = (DataIn.tex_coord.x - stripeStart) / (stripeEnd - stripeStart);
-                vec2 stripeUV = vec2(stripeU, DataIn.tex_coord.y);
+            if (tex_coord.x > stripeStart && tex_coord.x < stripeEnd) {
+                float stripeU = (tex_coord.x - stripeStart) / (stripeEnd - stripeStart);
+                vec2 stripeUV = vec2(stripeU, tex_coord.y);
                 finalTexture = texture(texmap6, stripeUV).rgb;
 
                 vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
@@ -312,7 +311,7 @@ void main() {
     
     // Fog
     if (uFogOn == 1) {
-        float dist = length(DataIn.posEye);
+        float dist = length(posEye);
         float f = (uFogEnd - dist) / (uFogEnd - uFogStart);
         f = clamp(f, 0.0, 1.0);                         // 0=fog, 1=scene
         colorOut.rgb = mix(uFogColor, colorOut.rgb, f); // linear blend

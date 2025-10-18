@@ -1395,14 +1395,14 @@ void drawSceneObjects(bool shadowMode){
 	// --- Draw cube env-mapped ---
 	{
 		mu.pushMatrix(gmu::MODEL);
-		mu.translate(gmu::MODEL, 0.0f, 2.0f, 0.0f);
+		mu.translate(gmu::MODEL, 0.0f, 4.0f, 0.0f);
 
-		mu.scale(gmu::MODEL, 1.0f, 1.0f, 1.0f);
+		mu.scale(gmu::MODEL, 2.0f, 2.0f, 2.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3(); // This is needed for reflection calculation
 
 		data.mesh = &allMeshes.cube;
-		data.texMode = 15;
+		data.texMode = shadowMode ? 13 : 15;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
