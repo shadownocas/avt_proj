@@ -1067,7 +1067,7 @@ void draw_floor(){
 	floorObj.worldAABB = aabbBox;
 
 	data.mesh = &allMeshes.quad;
-	data.texMode = 15; //14 VETRTO  - 2
+	data.texMode = 20; //multitexture
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
@@ -1387,6 +1387,27 @@ void drawSceneObjects(bool shadowMode){
 		data.normal = mu.getNormalMatrix();
 		data.view = mu.get(gmu::VIEW);
     	data.model = mu.get(gmu::MODEL);
+
+		renderer.renderMesh(data);
+		mu.popMatrix(gmu::MODEL);
+	}
+
+	// --- Draw cube env-mapped ---
+	{
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, 0.0f, 2.0f, 0.0f);
+
+		mu.scale(gmu::MODEL, 1.0f, 1.0f, 1.0f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3(); // This is needed for reflection calculation
+
+		data.mesh = &allMeshes.cube;
+		data.texMode = 15;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+		data.model = mu.get(gmu::MODEL);
 
 		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);

@@ -36,6 +36,8 @@ in Data {
     vec3 posEye;    // position in eye space
     vec2 tex_coord;
     vec3 skyboxTexCoord;
+    vec3 eyeDir;
+    vec3 reflectedDir;
 } DataIn;
 
 uniform Materials mat;
@@ -220,6 +222,16 @@ void main() {
         vec3 cubeColor = texture(texmap14, DataIn.skyboxTexCoord).rgb;
         colorOut = vec4(cubeColor, 1.0);
     }
+    else if (texMode == 15) { // Environmental cube mapping
+		vec4 cube_texel = texture(texmap14, DataIn.reflectedDir); // interpolated reflected vector from vertex shader
+		vec3 intensity3 = vec3(intensity); // vec3 intensity
+		texel = texture(texmap4, tex_coord);  // texel from metal.tga
+		vec4 aux_color = mix(texel, cube_texel, reflect_factor);
+		
+		// Calculate final color using component-wise operations
+		vec3 final_rgb = max(intensity3 * aux_color.rgb + spec.rgb, 0.1 * aux_color.rgb);
+		colorOut = vec4(final_rgb, 1.0);
+	}
     else {
         texel = texture(texmap, DataIn.tex_coord); // base floor
         vec3 finalTexture = texel.rgb;

@@ -6,6 +6,7 @@ uniform mat4 m_viewModel;  // model -> eye space
 uniform mat3 m_normal;     // normal matrix (for transforming normals)
 uniform mat4 m_View;
 uniform mat4 m_Model;   //por causa do cubo para a skybox
+uniform int texMode;
 
 // Vertex attributes
 in vec4 position;
@@ -19,11 +20,17 @@ out Data {
     vec3 posEye;    // position in eye space
     vec2 tex_coord; // texture coordinates
     vec3 skyboxTexCoord;
+    vec3 eyeDir;
+    vec3 reflectedDir;
 } DataOut;
 
 void main() {
     // Transform vertex position to eye space
     vec4 posEye4 = m_viewModel * position;
+
+    // Eye vector in eye space
+    vec3 eyeDir1 = -posEye4.xyz;
+    DataOut.eyeDir = eyeDir1;
 
     // Output eye-space position
     DataOut.posEye = posEye4.xyz;
@@ -43,4 +50,9 @@ void main() {
 
     DataOut.skyboxTexCoord = vec3(m_Model * position); // since translation is canceled, this works
     DataOut.skyboxTexCoord.x = -DataOut.skyboxTexCoord.x; // if needed to fix orientation
+
+    if (texMode == 15) {
+        DataOut.reflectedDir = vec3(transpose(m_View) * vec4(vec3(reflect(-DataOut.eyeDir, DataOut.normal)), 0.0)); //reflection vector in world coord
+        DataOut.reflectedDir.x= - DataOut.reflectedDir.x;
+    }
 }
