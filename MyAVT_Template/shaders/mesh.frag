@@ -191,7 +191,6 @@ void main() {
     }
     else if (texMode >= 8 && texMode <= 12) {
         // --- Flare effect ---
-        // Choose flare texture based on texMode
         if (texMode == 8)
             texel = texture(texmap8, tex_coord); // crcl
         else if (texMode == 9)
@@ -207,11 +206,11 @@ void main() {
 
         vec4 finalColor = texel * mat.diffuse;
 
-        if (finalColor.a < 0.05)
+        if (finalColor.a < 0.2)
             discard;
 
         colorOut = finalColor;
-        return; // Skip fog and lighting
+        return;
     }
     else if (texMode == 13) {
         // Shadow: black color with slight transparency

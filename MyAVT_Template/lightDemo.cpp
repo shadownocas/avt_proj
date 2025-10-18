@@ -982,7 +982,7 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
 void renderLampFlare(bool flareEffect, int *m_viewport) {
     if (!flareEffect) return;
 
-    float lightPos[4] = { -200, 200, 200, 1.0f };
+    float lightPos[4] = { 170, 200, -190, 1.0f };
 
     float lightScreenPos[3];
     int flarePos[2];
