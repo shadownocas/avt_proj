@@ -4,6 +4,7 @@
 uniform mat4 m_pvm;        // projection * view * model
 uniform mat4 m_viewModel;  // model -> eye space
 uniform mat3 m_normal;     // normal matrix (for transforming normals)
+//uniform mat4 m_Model;    //FIX
 
 // Vertex attributes
 in vec4 position;
@@ -16,6 +17,7 @@ out Data {
     vec3 eye;       // vector toward camera (eye space)
     vec3 posEye;    // position in eye space
     vec2 tex_coord; // texture coordinates
+    vec3 skyboxTexCoord;
 } DataOut;
 
 void main() {
@@ -37,4 +39,7 @@ void main() {
 
     // Compute clip-space position for rasterization
     gl_Position = m_pvm * position;
+
+    DataOut.skyboxTexCoord = position.xyz; // since translation is canceled, this works
+    DataOut.skyboxTexCoord.x = -DataOut.skyboxTexCoord.x; // if needed to fix orientation
 }

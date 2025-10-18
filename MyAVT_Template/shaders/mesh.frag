@@ -35,6 +35,7 @@ in Data {
     vec3 eye;       // vector toward camera
     vec3 posEye;    // position in eye space
     vec2 tex_coord;
+    vec3 skyboxTexCoord;
 } DataIn;
 
 uniform Materials mat;
@@ -54,7 +55,8 @@ uniform sampler2D texmap9;
 uniform sampler2D texmap10;  
 uniform sampler2D texmap11;  
 uniform sampler2D texmap12;  
-uniform sampler2D texmap13;  
+uniform sampler2D texmap13;
+uniform samplerCube texmap14;  
 
 // Directional light
 uniform vec3 dirLightDir;   
@@ -214,12 +216,14 @@ void main() {
         // Shadow: black color with slight transparency
         colorOut = vec4(0.0, 0.0, 0.0, 0.5);
     }
-
+    else if (texMode == 14) { //Skybox
+        vec3 cubeColor = texture(texmap14, DataIn.skyboxTexCoord).rgb;
+        colorOut = vec4(cubeColor, 1.0);
+    }
     else {
         texel = texture(texmap, DataIn.tex_coord); // base floor
         vec3 finalTexture = texel.rgb;
 
-        // combine with lighting/specular
         vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, 1.0);
 

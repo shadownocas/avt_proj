@@ -87,7 +87,7 @@ public:
 
   void setSpotLightMode(bool spotLightMode);
 
-  void setTexUnit(int tuId, int texObjId);
+  void setTexUnit(int tuId, int texObjId, GLenum texTarget);
 
   void setLampLights(const std::vector<PointLight> &pointLights, bool lampsOn);
 

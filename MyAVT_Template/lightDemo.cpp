@@ -1009,6 +1009,38 @@ void renderLampFlare(bool flareEffect, int *m_viewport) {
     mu.popMatrix(gmu::PROJECTION);
 }
 
+void draw_skybox() {
+	dataMesh data;
+
+	glDepthMask(GL_FALSE);
+	glFrontFace(GL_CW);
+
+	mu.pushMatrix(gmu::MODEL);
+	mu.pushMatrix(gmu::VIEW);
+
+	float* viewMatrix = mu.get(gmu::VIEW);
+	viewMatrix[12] = 0.0f;
+	viewMatrix[13] = 0.0f;
+	viewMatrix[14] = 0.0f;
+
+	mu.scale(gmu::MODEL, 500.0f, 500.0f, 500.0f);
+	mu.translate(gmu::MODEL, -0.5f, -0.5f, -0.5f);
+	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+
+	data.mesh   = &allMeshes.cube; 
+	data.texMode = 14;    
+	data.vm     = mu.get(gmu::VIEW_MODEL);
+	data.pvm    = mu.get(gmu::PROJ_VIEW_MODEL);
+	data.normal = mu.getNormalMatrix();
+	renderer.renderMesh(data);
+
+	mu.popMatrix(gmu::MODEL);
+	mu.popMatrix(gmu::VIEW);
+
+	glFrontFace(GL_CCW);
+	glDepthMask(GL_TRUE);
+}
+
 void draw_floor(){
 	dataMesh data;
 
@@ -1023,7 +1055,7 @@ void draw_floor(){
 	floorObj.worldAABB = aabbBox;
 
 	data.mesh = &allMeshes.quad;
-	data.texMode = 14; //14 VETRTO  - 2
+	data.texMode = 15; //14 VETRTO  - 2
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
@@ -1332,15 +1364,10 @@ void drawSceneObjects(bool shadowMode){
 
 }
 
-
 void renderSim(void)
 {
 
 	FrameCount++;
-	/* glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	glEnable(GL_BLEND);*/
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 	glClearStencil(0);
@@ -1351,21 +1378,22 @@ void renderSim(void)
 	renderer.setFog(gFogOn, gFogColor, gFogStart, gFogEnd);
 
 	update();
-
-	renderer.setTexUnit(0, 0);
-	renderer.setTexUnit(1, 1);
-	renderer.setTexUnit(2, 2);
-	renderer.setTexUnit(3, 3);
-	renderer.setTexUnit(4, 4);
-	renderer.setTexUnit(5, 5);
-	renderer.setTexUnit(6, 6);
-	renderer.setTexUnit(7, 7);
-	renderer.setTexUnit(8, 8);
-	renderer.setTexUnit(9, 9);
-	renderer.setTexUnit(10, 10);
-	renderer.setTexUnit(11, 11);
-	renderer.setTexUnit(12, 12);
-	renderer.setTexUnit(13, 13);
+	
+	renderer.setTexUnit(0, 0, GL_TEXTURE_2D);
+	renderer.setTexUnit(1, 1, GL_TEXTURE_2D);
+	renderer.setTexUnit(2, 2, GL_TEXTURE_2D);
+	renderer.setTexUnit(3, 3, GL_TEXTURE_2D);
+	renderer.setTexUnit(4, 4, GL_TEXTURE_2D);
+	renderer.setTexUnit(5, 5, GL_TEXTURE_2D);
+	renderer.setTexUnit(6, 6, GL_TEXTURE_2D);
+	renderer.setTexUnit(7, 7, GL_TEXTURE_2D);
+	renderer.setTexUnit(8, 8, GL_TEXTURE_2D);
+	renderer.setTexUnit(9, 9, GL_TEXTURE_2D);
+	renderer.setTexUnit(10, 10, GL_TEXTURE_2D);
+	renderer.setTexUnit(11, 11, GL_TEXTURE_2D);
+	renderer.setTexUnit(12, 12, GL_TEXTURE_2D);
+	renderer.setTexUnit(13, 13, GL_TEXTURE_2D);
+	renderer.setTexUnit(14, 14, GL_TEXTURE_CUBE_MAP); // Skybox 
 
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::MODEL);
@@ -1451,6 +1479,8 @@ void renderSim(void)
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+	draw_skybox();
 
 	// ----- RENDER PARTICLES -----
 	if(fireworks){
@@ -1758,26 +1788,26 @@ void mouseWheel(int wheel, int direction, int x, int y)
 
 void buildScene()
 {
-	// Texture Object definition
-	renderer.TexObjArray.texture2D_Loader("assets/pavement.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/checker.png");
-	renderer.TexObjArray.texture2D_Loader("assets/lightwood.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/metal.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/grass.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/road.tga");
-	renderer.TexObjArray.texture2D_Loader("assets/tree.tga");
+    renderer.TexObjArray.texture2D_Loader("assets/pavement.tga");
+    renderer.TexObjArray.texture2D_Loader("assets/checker.png");
+    renderer.TexObjArray.texture2D_Loader("assets/lightwood.tga");
+    renderer.TexObjArray.texture2D_Loader("assets/Bricks097.tga");
+    renderer.TexObjArray.texture2D_Loader("assets/metal.tga");
+    renderer.TexObjArray.texture2D_Loader("assets/grass.tga");
+    renderer.TexObjArray.texture2D_Loader("assets/road.tga");
+    renderer.TexObjArray.texture2D_Loader("assets/tree.tga");
 
-	// Flare element textures
-	renderer.TexObjArray.texture2D_Loader("assets/crcl.tga");  // 8
-	renderer.TexObjArray.texture2D_Loader("assets/flar.tga");  // 9
-	renderer.TexObjArray.texture2D_Loader("assets/hxgn.tga");  // 10
-	renderer.TexObjArray.texture2D_Loader("assets/ring.tga");  // 11
-	renderer.TexObjArray.texture2D_Loader("assets/sun.tga");   // 12
+    // Flare element textures
+    renderer.TexObjArray.texture2D_Loader("assets/crcl.tga");  // 8
+    renderer.TexObjArray.texture2D_Loader("assets/flar.tga");  // 9
+    renderer.TexObjArray.texture2D_Loader("assets/hxgn.tga");  // 10
+    renderer.TexObjArray.texture2D_Loader("assets/ring.tga");  // 11
+    renderer.TexObjArray.texture2D_Loader("assets/sun.tga");   // 12
+    renderer.TexObjArray.texture2D_Loader("assets/water.tga"); // 13
 
-	renderer.TexObjArray.texture2D_Loader("assets/water.tga");   // 12
-
-	
+    //const char *filenames[] = { "assets/posx.jpg","assets/negx.jpg","assets/posy.jpg","assets/negy.jpg","assets/posz.jpg","assets/negz.jpg" };
+	const char *filenames[] = { "assets/right.jpg", "assets/left.jpg", "assets/top.jpg", "assets/bottom.jpg", "assets/front.jpg", "assets/back.jpg" };
+    renderer.TexObjArray.textureCubeMap_Loader(filenames);
 
 	// Scene geometry with triangle meshes
 	MyMesh amesh;

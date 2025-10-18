@@ -140,6 +140,28 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
 
     glLinkProgram(program);
 
+    const char* samplerNames[] = {
+        "texmap", "texmap1", "texmap2", "texmap3", "texmap4", "texmap5",
+        "texmap6", "texmap7", "texmap8", "texmap9", "texmap10",
+        "texmap11", "texmap12", "texmap13", "texmap14"
+    };
+
+    for (int i = 0; i <= 14; ++i) {
+        tex_loc[i] = glGetUniformLocation(program, samplerNames[i]);
+        if (tex_loc[i] == -1)
+            printf("[WARNING] Sampler %-8s not active or optimized out\n", samplerNames[i]);
+        else
+            printf("[DEBUG] Sampler %-8s -> uniform location = %d\n", samplerNames[i], tex_loc[i]);
+    }
+
+    glUseProgram(program);
+    for (int i = 0; i <= 14; ++i) {
+        if (tex_loc[i] >= 0) {
+            glUniform1i(tex_loc[i], i); // bind sampler to texture unit i
+        }
+    }
+
+
     printf("InfoLog for Model Shaders and Program\n%s\n\n", shader.getAllInfoLogs().c_str());
     if (!shader.isProgramValid())
         printf("GLSL Model Program Not Valid!\n");
@@ -163,6 +185,7 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
     tex_loc[11] = glGetUniformLocation(program, "texmap11");
     tex_loc[12] = glGetUniformLocation(program, "texmap12");
     tex_loc[13] = glGetUniformLocation(program, "texmap13");
+    tex_loc[14] = glGetUniformLocation(program, "texmap14");
 
     return(shader.isProgramLinked() && shader.isProgramValid());
 }
@@ -302,11 +325,9 @@ void Renderer::setDroneSpotLights(SpotLight* lights, int count, bool enabled) {
     //glUniform1i(glGetUniformLocation(program, "numSpotLights"), count);
 }
 
-
-
-void Renderer::setTexUnit(int tuId, int texObjId) {
+void Renderer::setTexUnit(int tuId, int texObjId, GLenum texTarget) {
     glActiveTexture(GL_TEXTURE0 + tuId);
-    glBindTexture(GL_TEXTURE_2D, TexObjArray.getTextureId(texObjId));
+    glBindTexture(texTarget, TexObjArray.getTextureId(texObjId));
     glUniform1i(tex_loc[tuId], tuId);
 }
 
