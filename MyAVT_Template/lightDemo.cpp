@@ -1025,16 +1025,9 @@ void draw_skybox() {
 	viewMatrix[13] = 0.0f;
 	viewMatrix[14] = 0.0f;
 
-	float skyboxHeight = 300.0f;      // matches your scale
-	float groundY = 0.0f;             // Y coordinate of your ground
-
-	// Move skybox so bottom touches ground
-	float offsetY = groundY + skyboxHeight / 2.0f;
-
-	mu.scale(gmu::MODEL, 300.0f, 300.0f, 300.0f);      // scale skybox
+	mu.scale(gmu::MODEL, 300.0f, 500.0f, 300.0f);
 	mu.translate(gmu::MODEL, -0.5f, -0.5f , -0.5f); 
 
-	 //mu.scale(gmu::MODEL, 300.0f, 300.0f, 300.0f);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
 	data.mesh   = &allMeshes.cube; 
@@ -2077,9 +2070,9 @@ void buildScene()
 
 	floorObj.aabb = allMeshes.quad.aabb;
 
-	cams[0].camPos[1] = 200.0;
+	cams[0].camPos[1] = 100.0;
 	cams[0].camPos[0] = 0.0;
-	cams[0].camPos[2] = 0.33;
+	cams[0].camPos[2] = 0.33f;
 	// top ortho
 	cams[1].camPos[1] = 200.0;
 	cams[1].camPos[2] = 0.33;
