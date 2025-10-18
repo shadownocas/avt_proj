@@ -169,6 +169,8 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
     pvm_loc = glGetUniformLocation(program, "m_pvm");
     vm_loc = glGetUniformLocation(program, "m_viewModel");
     normal_loc = glGetUniformLocation(program, "m_normal");
+    view_loc = glGetUniformLocation(program, "m_View");
+    model_loc = glGetUniformLocation(program, "m_Model");
     texMode_loc = glGetUniformLocation(program, "texMode"); // different modes of texturing
     lpos_loc = glGetUniformLocation(program, "l_pos");
     tex_loc[0] = glGetUniformLocation(program, "texmap");
@@ -339,6 +341,8 @@ void Renderer::renderMesh(const dataMesh& data) {
     glUniformMatrix4fv(vm_loc, 1, GL_FALSE, data.vm);
     glUniformMatrix4fv(pvm_loc, 1, GL_FALSE, data.pvm);
     glUniformMatrix3fv(normal_loc, 1, GL_FALSE, data.normal);
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, data.view);
+    glUniformMatrix4fv(model_loc, 1, GL_FALSE, data.model);
 
     // send the material
     loc = glGetUniformLocation(program, "mat.ambient");

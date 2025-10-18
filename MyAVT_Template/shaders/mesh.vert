@@ -4,7 +4,8 @@
 uniform mat4 m_pvm;        // projection * view * model
 uniform mat4 m_viewModel;  // model -> eye space
 uniform mat3 m_normal;     // normal matrix (for transforming normals)
-//uniform mat4 m_Model;    //FIX
+uniform mat4 m_View;
+uniform mat4 m_Model;   //por causa do cubo para a skybox
 
 // Vertex attributes
 in vec4 position;
@@ -40,6 +41,6 @@ void main() {
     // Compute clip-space position for rasterization
     gl_Position = m_pvm * position;
 
-    DataOut.skyboxTexCoord = position.xyz; // since translation is canceled, this works
+    DataOut.skyboxTexCoord = vec3(m_Model * position); // since translation is canceled, this works
     DataOut.skyboxTexCoord.x = -DataOut.skyboxTexCoord.x; // if needed to fix orientation
 }

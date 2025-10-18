@@ -970,6 +970,8 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
 		renderer.renderMesh(data);
 
 		mu.popMatrix(gmu::MODEL);
@@ -1023,8 +1025,16 @@ void draw_skybox() {
 	viewMatrix[13] = 0.0f;
 	viewMatrix[14] = 0.0f;
 
-	mu.scale(gmu::MODEL, 500.0f, 500.0f, 500.0f);
-	mu.translate(gmu::MODEL, -0.5f, -0.5f, -0.5f);
+	float skyboxHeight = 300.0f;      // matches your scale
+	float groundY = 0.0f;             // Y coordinate of your ground
+
+	// Move skybox so bottom touches ground
+	float offsetY = groundY + skyboxHeight / 2.0f;
+
+	mu.scale(gmu::MODEL, 300.0f, 300.0f, 300.0f);      // scale skybox
+	mu.translate(gmu::MODEL, -0.5f, -0.5f , -0.5f); 
+
+	 //mu.scale(gmu::MODEL, 300.0f, 300.0f, 300.0f);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
 	data.mesh   = &allMeshes.cube; 
@@ -1032,6 +1042,8 @@ void draw_skybox() {
 	data.vm     = mu.get(gmu::VIEW_MODEL);
 	data.pvm    = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
+	data.view = mu.get(gmu::VIEW);
+    data.model = mu.get(gmu::MODEL);
 	renderer.renderMesh(data);
 
 	mu.popMatrix(gmu::MODEL);
@@ -1059,6 +1071,8 @@ void draw_floor(){
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 	data.normal = mu.getNormalMatrix();
+	data.view = mu.get(gmu::VIEW);
+    data.model = mu.get(gmu::MODEL);
 	renderer.renderMesh(data);
 	mu.popMatrix(gmu::MODEL);
 }
@@ -1139,6 +1153,8 @@ void drawSceneObjects(bool shadowMode){
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
 		renderer.renderMesh(data);
 
 		mu.popMatrix(gmu::MODEL);
@@ -1179,6 +1195,8 @@ void drawSceneObjects(bool shadowMode){
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
 		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
 
@@ -1207,6 +1225,8 @@ void drawSceneObjects(bool shadowMode){
 			data.vm = mu.get(gmu::VIEW_MODEL);
 			data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 			data.normal = mu.getNormalMatrix();
+			data.view = mu.get(gmu::VIEW);
+    		data.model = mu.get(gmu::MODEL);
 			renderer.renderMesh(data);
 
 			mu.popMatrix(gmu::MODEL);
@@ -1235,6 +1255,8 @@ void drawSceneObjects(bool shadowMode){
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
         renderer.renderMesh(data);
         mu.popMatrix(gmu::MODEL);
     }
@@ -1259,6 +1281,8 @@ void drawSceneObjects(bool shadowMode){
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
 
 		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
@@ -1280,6 +1304,8 @@ void drawSceneObjects(bool shadowMode){
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
         renderer.renderMesh(data);
         mu.popMatrix(gmu::MODEL);
 	}
@@ -1322,6 +1348,8 @@ void drawSceneObjects(bool shadowMode){
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
         data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
         renderer.renderMesh(data);
         mu.popMatrix(gmu::MODEL);
 
@@ -1357,6 +1385,8 @@ void drawSceneObjects(bool shadowMode){
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
+		data.view = mu.get(gmu::VIEW);
+    	data.model = mu.get(gmu::MODEL);
 
 		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
@@ -1378,7 +1408,7 @@ void renderSim(void)
 	renderer.setFog(gFogOn, gFogColor, gFogStart, gFogEnd);
 
 	update();
-	
+
 	renderer.setTexUnit(0, 0, GL_TEXTURE_2D);
 	renderer.setTexUnit(1, 1, GL_TEXTURE_2D);
 	renderer.setTexUnit(2, 2, GL_TEXTURE_2D);
@@ -1508,7 +1538,8 @@ void renderSim(void)
 				data.vm = mu.get(gmu::VIEW_MODEL);
 				data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 				data.normal = mu.getNormalMatrix();
-
+				data.view = mu.get(gmu::VIEW);
+    			data.model = mu.get(gmu::MODEL);
 				renderer.renderMesh(data);
 
 				mu.popMatrix(gmu::MODEL);

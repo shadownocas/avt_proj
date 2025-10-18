@@ -13,7 +13,7 @@
 
 struct dataMesh {
   MyMesh* mesh;    
-  float *pvm, *vm, *normal;  //matrices pointers
+  float *pvm, *vm, *normal, *view, *model;  //matrices pointers
   int texMode = 0;  //type of shading-> 0:no texturing; 1:modulate diffuse color with texel color; 2:diffuse color is replaced by texel color; 3: multitexturing
 };
 
@@ -109,7 +109,7 @@ private:
   // Text font rasterizer GLSL program
   GLuint textProgram;
 
-  GLint pvm_loc, vm_loc, normal_loc, lpos_loc, texMode_loc;
+  GLint pvm_loc, vm_loc, normal_loc, lpos_loc, texMode_loc, view_loc, model_loc;
   GLint tex_loc[MAX_TEXTURES];
 
   //render font GLSL program variable locations and VAO
