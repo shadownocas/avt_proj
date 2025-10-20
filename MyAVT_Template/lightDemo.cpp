@@ -224,8 +224,8 @@ bool spotlight_mode = false;
 SpotLight droneHeadlights[2]; // two headlights
 
 // City
-int rows = 7; // number of rows
-int cols = 7; // number of columns
+int rows = 14; // number of rows
+int cols = 14; // number of columns
 float gap = 20.0f;
 float offsetX = -((cols - 1) * (10.0f + gap)) / 2.0f;
 float offsetZ = -((rows - 1) * (10.0f + gap)) / 2.0f;
@@ -1025,7 +1025,7 @@ void draw_skybox() {
 	viewMatrix[13] = 0.0f;
 	viewMatrix[14] = 0.0f;
 
-	mu.scale(gmu::MODEL, 300.0f, 500.0f, 300.0f);
+	mu.scale(gmu::MODEL, 500.0f, 1000.0f, 500.0f);
 	mu.translate(gmu::MODEL, -0.5f, -0.5f , -0.5f); 
 
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
@@ -1050,7 +1050,7 @@ void draw_floor(){
 	dataMesh data;
 
 	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, 250.0f, 0.1f, 200.0f);
+	mu.scale(gmu::MODEL, 450.0f, 0.1f, 400.0f);
 	mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 	mu.computeNormalMatrix3x3();
@@ -1998,7 +1998,7 @@ void buildScene()
 
 				buildings.push_back(b);
 
-				buildingHeights[r][c] = std::max((rand() % 20) + 8.0f, 10.0f);
+				buildingHeights[r][c] = std::max((rand() % 20) + 15.0f, 20.0f);
 			}
 			else
 			{

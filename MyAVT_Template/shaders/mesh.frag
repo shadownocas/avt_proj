@@ -240,12 +240,12 @@ void main() {
         // --- Garden overlay ---
         float gardenCenterX = 105.0;
         float gardenCenterZ = 95.0;
-        float gardenW = 70.0;
-        float gardenD = 70.0;
+        float gardenW = 40.0;
+        float gardenD = 40.0;
 
         // --- Lake overlay ---
-        float lakeCenterX = 20.0;
-        float lakeCenterZ = 95.0;
+        float lakeCenterX = 45.0;
+        float lakeCenterZ = 160.0;
         float lakeW = 60.0;
         float lakeD = 40.0;
 
@@ -302,10 +302,11 @@ void main() {
                 vec2 stripeUV = vec2(stripeU, tex_coord.y);
                 finalTexture = texture(texmap6, stripeUV).rgb;
 
-                vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
-                colorOut = vec4(finalColor, 1.0);
-            }
-        }
+        vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
+        colorOut = vec4(finalColor, 1.0);
+    }
+}
+
     }
     
     // Fog
