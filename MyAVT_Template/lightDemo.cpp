@@ -1408,6 +1408,117 @@ void drawSceneObjects(bool shadowMode){
 
 }
 
+void drawRearViewMirror() {
+    const int MIRROR_WIDTH = 800;
+    const int MIRROR_HEIGHT = 600;
+    const int MIRROR_X = (WinX - MIRROR_WIDTH - 20);
+    float y_bottom = WinY - 20 - MIRROR_HEIGHT;
+
+    glEnable(GL_DEPTH_TEST);
+
+    glEnable(GL_STENCIL_TEST);
+    glStencilMask(0xFF);
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glDepthMask(GL_FALSE);
+    
+    mu.pushMatrix(gmu::PROJECTION);
+    mu.loadIdentity(gmu::PROJECTION);
+    mu.ortho(0.0f, (float)WinX, 0.0f, (float)WinY, -1.0f, 1.0f);
+
+    mu.pushMatrix(gmu::VIEW);
+    mu.loadIdentity(gmu::VIEW); 
+    
+    mu.pushMatrix(gmu::MODEL);
+    mu.loadIdentity(gmu::MODEL);
+    
+    mu.translate(gmu::MODEL, MIRROR_X, y_bottom, 0.0f);
+    mu.scale(gmu::MODEL, MIRROR_WIDTH / 5.0f, MIRROR_HEIGHT / 3.0f, 1.0f); 
+
+    mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+
+    dataMesh data;
+    data.mesh = &allMeshes.quad; // quad
+    data.texMode = 1;
+    data.vm = mu.get(gmu::VIEW_MODEL);
+    data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+    data.normal = mu.getNormalMatrix();
+    data.view = mu.get(gmu::VIEW);
+    data.model = mu.get(gmu::MODEL);
+    
+    renderer.renderMesh(data);
+    
+    mu.popMatrix(gmu::MODEL);
+    mu.popMatrix(gmu::VIEW);
+    mu.popMatrix(gmu::PROJECTION);
+
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_TRUE);
+
+    glViewport(MIRROR_X, (int)y_bottom, MIRROR_WIDTH, MIRROR_HEIGHT);
+    
+    mu.pushMatrix(gmu::PROJECTION);
+    mu.loadIdentity(gmu::PROJECTION);
+    float ratio = (1.0f * MIRROR_WIDTH) / MIRROR_HEIGHT;
+    mu.perspective(60.0f, ratio, 0.1f, 1000.0f);
+
+    mu.pushMatrix(gmu::VIEW);
+    mu.loadIdentity(gmu::VIEW);
+    
+    float yawRad = drone.rotation[1] * (M_PI / 180.0f);
+    float camOffsetX = 1.0f * cosf(yawRad);
+    float camOffsetZ = -1.0f * sinf(yawRad);
+    float targetX = drone.position[0] + 20.0f * cosf(yawRad);
+    float targetZ = drone.position[2] - 10.0f * sinf(yawRad);
+	float targetY = drone.position[1] + 2.5f;
+
+    mu.lookAt(drone.position[0] + camOffsetX, targetY, drone.position[2] + camOffsetZ,
+              targetX, targetY, targetZ,
+              0.0f, 1.0f, 0.0f);
+    
+    glStencilFunc(GL_EQUAL, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+    
+    glClear(GL_DEPTH_BUFFER_BIT);
+    
+    draw_skybox();
+    draw_floor();
+    float shadowMat[16];
+    drawSceneObjects(false);
+    
+    mu.popMatrix(gmu::VIEW);
+    mu.popMatrix(gmu::PROJECTION);
+    
+    glDisable(GL_STENCIL_TEST);
+    glViewport(0, 0, WinX, WinY);
+    
+    mu.loadIdentity(gmu::PROJECTION);
+	
+    float mainRatio = (float)WinX / (float)WinY;
+    if (activeCam != 1) {
+        mu.perspective(53.13f, mainRatio, 0.1f, 1000.0f);
+    } else {
+        float aspect = (float)WinX / (float)WinY;
+        float orthoSize = 60.0f;
+        if (aspect >= 1.0f) {
+            mu.ortho(-orthoSize * aspect, orthoSize * aspect,
+                    -orthoSize, orthoSize, -500.0f, 500.0f);
+        } else {
+            mu.ortho(-orthoSize, orthoSize,
+                    -orthoSize / aspect, orthoSize / aspect,
+                    -500.0f, 500.0f);
+        }
+    }
+    
+    mu.loadIdentity(gmu::VIEW);
+    mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
+              cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2],
+              0, 1, 0);
+}
+
 void renderSim(void)
 {
 
@@ -1577,6 +1688,8 @@ void renderSim(void)
 	std::array<float, 4> color;
 
 	glDisable(GL_DEPTH_TEST);
+	drawRearViewMirror();
+
 	glEnable(GL_BLEND);  
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
