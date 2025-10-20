@@ -1409,114 +1409,175 @@ void drawSceneObjects(bool shadowMode){
 }
 
 void drawRearViewMirror() {
-    const int MIRROR_WIDTH = 800;
-    const int MIRROR_HEIGHT = 600;
-    const int MIRROR_X = (WinX - MIRROR_WIDTH - 20);
-    float y_bottom = WinY - 20 - MIRROR_HEIGHT;
+const float MIRROR_WIDTH_RATIO  = 0.25f; 
+const float MIRROR_HEIGHT_RATIO = 0.30f;
 
-    glEnable(GL_DEPTH_TEST);
+int MIRROR_WIDTH  = static_cast<int>(WinX * MIRROR_WIDTH_RATIO);
+int MIRROR_HEIGHT = static_cast<int>(WinY * MIRROR_HEIGHT_RATIO);
+int MIRROR_X      = static_cast<int>(WinX - MIRROR_WIDTH * 0.8);
+int MIRROR_Y      = static_cast<int>(WinY - MIRROR_HEIGHT * 0.8);
 
-    glEnable(GL_STENCIL_TEST);
-    glStencilMask(0xFF);
-    glClear(GL_STENCIL_BUFFER_BIT);
-    glStencilFunc(GL_ALWAYS, 1, 0xFF);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
-    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    glDepthMask(GL_FALSE);
-    
-    mu.pushMatrix(gmu::PROJECTION);
-    mu.loadIdentity(gmu::PROJECTION);
-    mu.ortho(0.0f, (float)WinX, 0.0f, (float)WinY, -1.0f, 1.0f);
+	glEnable(GL_DEPTH_TEST);
 
-    mu.pushMatrix(gmu::VIEW);
-    mu.loadIdentity(gmu::VIEW); 
-    
-    mu.pushMatrix(gmu::MODEL);
-    mu.loadIdentity(gmu::MODEL);
-    
-    mu.translate(gmu::MODEL, MIRROR_X, y_bottom, 0.0f);
-    mu.scale(gmu::MODEL, MIRROR_WIDTH / 5.0f, MIRROR_HEIGHT / 3.0f, 1.0f); 
+	glEnable(GL_STENCIL_TEST);
+	glStencilMask(0xFF);
+	glClear(GL_STENCIL_BUFFER_BIT);
+	glStencilFunc(GL_ALWAYS, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
-    mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	glDepthMask(GL_FALSE);
 
-    dataMesh data;
-    data.mesh = &allMeshes.quad; // quad
-    data.texMode = 1;
-    data.vm = mu.get(gmu::VIEW_MODEL);
-    data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
-    data.normal = mu.getNormalMatrix();
-    data.view = mu.get(gmu::VIEW);
-    data.model = mu.get(gmu::MODEL);
-    
-    renderer.renderMesh(data);
-    
-    mu.popMatrix(gmu::MODEL);
-    mu.popMatrix(gmu::VIEW);
-    mu.popMatrix(gmu::PROJECTION);
+	mu.pushMatrix(gmu::PROJECTION);
+	mu.loadIdentity(gmu::PROJECTION);
+	mu.ortho(0.0f, (float)WinX, 0.0f, (float)WinY, -1.0f, 1.0f);
 
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glDepthMask(GL_TRUE);
+	mu.pushMatrix(gmu::VIEW);
+	mu.loadIdentity(gmu::VIEW);
 
-    glViewport(MIRROR_X, (int)y_bottom, MIRROR_WIDTH, MIRROR_HEIGHT);
-    
-    mu.pushMatrix(gmu::PROJECTION);
-    mu.loadIdentity(gmu::PROJECTION);
-    float ratio = (1.0f * MIRROR_WIDTH) / MIRROR_HEIGHT;
-    mu.perspective(60.0f, ratio, 0.1f, 1000.0f);
+	mu.pushMatrix(gmu::MODEL);
+	mu.loadIdentity(gmu::MODEL);
+	mu.translate(gmu::MODEL, MIRROR_X, MIRROR_Y, 0.0f);
+	mu.scale(gmu::MODEL, MIRROR_WIDTH, MIRROR_HEIGHT, 1.0f);
+	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
-    mu.pushMatrix(gmu::VIEW);
-    mu.loadIdentity(gmu::VIEW);
-    
-    float yawRad = drone.rotation[1] * (M_PI / 180.0f);
-    float camOffsetX = 1.0f * cosf(yawRad);
-    float camOffsetZ = -1.0f * sinf(yawRad);
-    float targetX = drone.position[0] + 20.0f * cosf(yawRad);
-    float targetZ = drone.position[2] - 10.0f * sinf(yawRad);
-	float targetY = drone.position[1] + 2.5f;
+	dataMesh data;
+	data.mesh = &allMeshes.quad;
+	data.texMode = 1;
+	data.vm = mu.get(gmu::VIEW_MODEL);
+	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+	data.normal = mu.getNormalMatrix();
+	data.view = mu.get(gmu::VIEW);
+	data.model = mu.get(gmu::MODEL);
+	renderer.renderMesh(data);
 
-    mu.lookAt(drone.position[0] + camOffsetX, targetY, drone.position[2] + camOffsetZ,
-              targetX, targetY, targetZ,
-              0.0f, 1.0f, 0.0f);
-    
-    glStencilFunc(GL_EQUAL, 1, 0xFF);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-    
-    glClear(GL_DEPTH_BUFFER_BIT);
-    
-    draw_skybox();
-    draw_floor();
-    float shadowMat[16];
-    drawSceneObjects(false);
-    
-    mu.popMatrix(gmu::VIEW);
-    mu.popMatrix(gmu::PROJECTION);
-    
-    glDisable(GL_STENCIL_TEST);
-    glViewport(0, 0, WinX, WinY);
-    
-    mu.loadIdentity(gmu::PROJECTION);
-	
-    float mainRatio = (float)WinX / (float)WinY;
-    if (activeCam != 1) {
-        mu.perspective(53.13f, mainRatio, 0.1f, 1000.0f);
-    } else {
-        float aspect = (float)WinX / (float)WinY;
-        float orthoSize = 60.0f;
-        if (aspect >= 1.0f) {
-            mu.ortho(-orthoSize * aspect, orthoSize * aspect,
-                    -orthoSize, orthoSize, -500.0f, 500.0f);
-        } else {
-            mu.ortho(-orthoSize, orthoSize,
-                    -orthoSize / aspect, orthoSize / aspect,
-                    -500.0f, 500.0f);
-        }
+	mu.popMatrix(gmu::MODEL);
+	mu.popMatrix(gmu::VIEW);
+	mu.popMatrix(gmu::PROJECTION);
+
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDepthMask(GL_TRUE);
+
+	glViewport(MIRROR_X, MIRROR_Y, MIRROR_WIDTH, MIRROR_HEIGHT);
+
+	mu.pushMatrix(gmu::PROJECTION);
+	mu.loadIdentity(gmu::PROJECTION);
+	float aspect = (float)MIRROR_WIDTH / (float)MIRROR_HEIGHT;
+	mu.perspective(60.0f, aspect, 0.1f, 1000.0f);
+
+	mu.pushMatrix(gmu::VIEW);
+	mu.loadIdentity(gmu::VIEW);
+
+	float yawRad = drone.rotation[1] * (M_PI / 180.0f);
+	float offsetX = -sinf(yawRad);
+	float offsetZ = -cosf(yawRad);
+
+	float camX = drone.position[0] + offsetX * 2.0f;
+	float camY = drone.position[1] + 2.5f;
+	float camZ = drone.position[2] + offsetZ * 2.0f;
+
+	// Look further behind along same direction
+	float targetX = drone.position[0] + offsetX * 20.0f;
+	float targetY = camY;
+	float targetZ = drone.position[2] + offsetZ * 20.0f;
+
+    mu.lookAt(camX, camY, camZ,
+            targetX, targetY, targetZ,
+            0.0f, 1.0f, 0.0f);
+
+    {
+        float dirLightWorld[4] = { 0.5f, -0.7f, 0.3f, 0.0f };
+        float dirLightEye[4];
+        mu.multMatrixPoint(gmu::VIEW, dirLightWorld, dirLightEye);
+        float dirEye3[3] = { dirLightEye[0], dirLightEye[1], dirLightEye[2] };
+        renderer.setDirectionalLight(dirEye3, dayMode ? dirLightColor : nightLightColor);
     }
-    
-    mu.loadIdentity(gmu::VIEW);
-    mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
-              cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2],
-              0, 1, 0);
+
+    {
+        std::vector<PointLight> rearPointLights;
+        rearPointLights.reserve(lampPosts.size());
+        for (const LampPost &lamp : lampPosts) {
+            float lx = lamp.position[0];
+            float ly = lamp.height;
+            float lz = lamp.position[2];
+            float worldPos[4] = { lx, ly, lz, 1.0f };
+            float eyePos[4];
+            mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+
+            PointLight pl;
+            pl.LocalPos[0] = eyePos[0];
+            pl.LocalPos[1] = eyePos[1];
+            pl.LocalPos[2] = eyePos[2];
+            pl.Color[0] = 3.0f; pl.Color[1] = 2.7f; pl.Color[2] = 2.1f;
+            pl.atten.constant = 1.0f;
+            pl.atten.linear   = 0.02f;
+            pl.atten.exp      = 0.02f;
+            rearPointLights.push_back(pl);
+        }
+        renderer.setLampLights(rearPointLights, lampsOn);
+    }
+
+    {
+        float localHeadlightOffsets[2][4] = {
+            {-0.5f, 0.0f, 1.0f, 1.0f}, // left
+            { 0.5f, 0.0f, 1.0f, 1.0f}  // right
+        };
+        SpotLight rearHeadlights[2];
+
+        mu.pushMatrix(gmu::MODEL);
+        mu.translate(gmu::MODEL, drone.position[0], drone.position[1], drone.position[2]);
+        mu.rotate(gmu::MODEL, drone.rotation[1], 0.0f, 1.0f, 0.0f);
+
+        for (int i = 0; i < 2; ++i) {
+            float worldPos[4];
+            mu.multMatrixPoint(gmu::MODEL, localHeadlightOffsets[i], worldPos);
+            float eyePos[4];
+            mu.multMatrixPoint(gmu::VIEW, worldPos, eyePos);
+
+            float localDir[4] = {0.0f, 0.0f, 1.0f, 0.0f};
+            float worldDir[4]; mu.multMatrixPoint(gmu::MODEL, localDir, worldDir);
+            float eyeDir[4]; mu.multMatrixPoint(gmu::VIEW, worldDir, eyeDir);
+
+            rearHeadlights[i].Position[0] = eyePos[0];
+            rearHeadlights[i].Position[1] = eyePos[1];
+            rearHeadlights[i].Position[2] = eyePos[2];
+            rearHeadlights[i].Direction[0] = eyeDir[0];
+            rearHeadlights[i].Direction[1] = eyeDir[1];
+            rearHeadlights[i].Direction[2] = eyeDir[2];
+            rearHeadlights[i].Color[0] = 1.0f; rearHeadlights[i].Color[1] = 1.0f; rearHeadlights[i].Color[2] = 0.9f;
+            rearHeadlights[i].atten.constant = 1.0f;
+            rearHeadlights[i].atten.linear = 0.1f;
+            rearHeadlights[i].atten.exp = 0.01f;
+            rearHeadlights[i].Cutoff = cosf(20.0f * 3.14159f / 180.0f);
+        }
+        mu.popMatrix(gmu::MODEL);
+
+        renderer.setDroneSpotLights(rearHeadlights, 2, spotlight_mode);
+    }
+
+	glStencilFunc(GL_EQUAL, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	draw_skybox();
+	draw_floor();
+	drawSceneObjects(false);
+
+	mu.popMatrix(gmu::VIEW);
+	mu.popMatrix(gmu::PROJECTION);
+
+	glDisable(GL_STENCIL_TEST);
+	glViewport(0, 0, WinX, WinY);
+
+	mu.loadIdentity(gmu::PROJECTION);
+	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+	float mainAspect = (float)WinX / (float)WinY;
+
+	mu.loadIdentity(gmu::VIEW);
+	mu.lookAt(cams[activeCam].camPos[0], cams[activeCam].camPos[1], cams[activeCam].camPos[2],
+			cams[activeCam].camTarget[0], cams[activeCam].camTarget[1], cams[activeCam].camTarget[2],
+			0, 1, 0);
 }
 
 void renderSim(void)
