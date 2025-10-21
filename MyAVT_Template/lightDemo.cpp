@@ -1611,6 +1611,7 @@ void renderSim(void)
 	renderer.setTexUnit(12, 12, GL_TEXTURE_2D);
 	renderer.setTexUnit(13, 13, GL_TEXTURE_2D);
 	renderer.setTexUnit(14, 14, GL_TEXTURE_CUBE_MAP); // Skybox 
+	renderer.setTexUnit(15, 15, GL_TEXTURE_2D);
 
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::MODEL);
@@ -2040,6 +2041,7 @@ void buildScene()
     //const char *filenames[] = { "assets/posx.jpg","assets/negx.jpg","assets/posy.jpg","assets/negy.jpg","assets/posz.jpg","assets/negz.jpg" };
 	const char *filenames[] = { "assets/right.jpg", "assets/left.jpg", "assets/top.jpg", "assets/bottom.jpg", "assets/front.jpg", "assets/back.jpg" };
     renderer.TexObjArray.textureCubeMap_Loader(filenames);
+	renderer.TexObjArray.texture2D_Loader("assets/normal.tga"); //15
 
 	// Scene geometry with triangle meshes
 	MyMesh amesh;

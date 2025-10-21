@@ -57,7 +57,8 @@ uniform sampler2D texmap10;
 uniform sampler2D texmap11;  
 uniform sampler2D texmap12;  
 uniform sampler2D texmap13;
-uniform samplerCube texmap14;  
+uniform samplerCube texmap14;
+uniform sampler2D texmap15;
 
 // Directional light
 uniform vec3 dirLightDir;   
@@ -122,24 +123,29 @@ vec3 calcSpotLight(SpotLight light, vec3 Normal, vec3 View, vec3 posEye) {
 
 
 void main() {
-    vec3 N = normalize(normal1);
+    vec3 n;
     vec3 V = normalize(eye); // eye-space view vector
     vec3 intensity = mat.ambient.rgb; // start with ambient
 
+    if (texMode == 3)
+        n = normalize(2.0 * texture(texmap15, tex_coord).rgb -1.0);
+    else 
+        n = normalize(normal1);
+
     // --- Directional light ---
     vec3 Ldir = normalize(-dirLightDir);
-    intensity += calcPhong(N, V, Ldir, dirLightColor);
+    intensity += calcPhong(n, V, Ldir, dirLightColor);
 
     // --- Point lights ---
     if (lampsOn) {
         for (int i = 0; i < numLamps; ++i) {
-            intensity += calcPointLight(pointLights[i], N, V, posEye);
+            intensity += calcPointLight(pointLights[i], n, V, posEye);
         }
     }
 
 	if (spotlightsOn) {
 		for (int i = 0; i < 2; ++i) {
-			intensity += calcSpotLight(spotLights[i], N, V, posEye);
+			intensity += calcSpotLight(spotLights[i], n, V, posEye);
 		}
 	}
 
@@ -161,7 +167,6 @@ void main() {
         vec3 finalColor = max(intensity * texel.rgb + spec.rgb, 0.07 * texel.rgb);
         colorOut = vec4(finalColor, texel.a);
     }
-
     else if (texMode == 3) {
         texel = texture(texmap3, tex_coord);
         vec3 finalColor = max(intensity * mat.diffuse.rgb * texel.rgb + spec.rgb, 0.07 * texel.rgb);

@@ -137,16 +137,17 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
     glBindAttribLocation(program, Shader::VERTEX_COORD_ATTRIB, "position");
     glBindAttribLocation(program, Shader::NORMAL_ATTRIB, "normal");
     glBindAttribLocation(program, Shader::TEXTURE_COORD_ATTRIB, "texCoord");
+    glBindAttribLocation(program, Shader::TANGENT_ATTRIB, "tangent");
 
     glLinkProgram(program);
 
     const char* samplerNames[] = {
         "texmap", "texmap1", "texmap2", "texmap3", "texmap4", "texmap5",
         "texmap6", "texmap7", "texmap8", "texmap9", "texmap10",
-        "texmap11", "texmap12", "texmap13", "texmap14"
+        "texmap11", "texmap12", "texmap13", "texmap14", "texmap15",
     };
 
-    for (int i = 0; i <= 14; ++i) {
+    for (int i = 0; i <= 15; ++i) {
         tex_loc[i] = glGetUniformLocation(program, samplerNames[i]);
         if (tex_loc[i] == -1)
             printf("[WARNING] Sampler %-8s not active or optimized out\n", samplerNames[i]);
@@ -155,7 +156,7 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
     }
 
     glUseProgram(program);
-    for (int i = 0; i <= 14; ++i) {
+    for (int i = 0; i <= 15; ++i) {
         if (tex_loc[i] >= 0) {
             glUniform1i(tex_loc[i], i); // bind sampler to texture unit i
         }
@@ -188,6 +189,7 @@ bool Renderer::setRenderMeshesShaderProg(const std::string& vertShaderPath, cons
     tex_loc[12] = glGetUniformLocation(program, "texmap12");
     tex_loc[13] = glGetUniformLocation(program, "texmap13");
     tex_loc[14] = glGetUniformLocation(program, "texmap14");
+    tex_loc[15] = glGetUniformLocation(program, "texmap15");
 
     return(shader.isProgramLinked() && shader.isProgramValid());
 }
