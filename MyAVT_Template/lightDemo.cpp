@@ -269,7 +269,6 @@ int finalScore = 0;
 
 //Flare effect
 FLARE_DEF AVTflare; 
-bool flareEffect = false;
 float lightScreenPos[3];  //Position of the light in Window Coordinates
 
 //Shadow effect
@@ -979,17 +978,23 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
 }
 
 
-void renderLampFlare(bool flareEffect, int *m_viewport) {
-    if (!flareEffect) return;
-
+void renderLampFlare(int *m_viewport) {
     float lightPos[4] = { 170, 200, -190, 1.0f };
-
     float lightScreenPos[3];
     int flarePos[2];
+	float lightEye[4];
 
     mu.pushMatrix(gmu::MODEL);
     mu.loadIdentity(gmu::MODEL);
     mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+
+    mu.multMatrixPoint(gmu::VIEW, lightPos, lightEye);
+
+    // Reject if light is behind the camera
+    if (lightEye[2] > 0.0f) {
+        mu.popMatrix(gmu::MODEL);
+        return;
+    }
 
     if (!mu.project(lightPos, lightScreenPos, m_viewport))
         printf("Error projecting lamp top!\n");
@@ -1351,7 +1356,7 @@ void drawSceneObjects(bool shadowMode){
 
 	int m_viewport[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
-	renderLampFlare(true, m_viewport);
+	renderLampFlare(m_viewport);
 
 	// --- Draw package ---
 	{ 
@@ -1768,12 +1773,6 @@ void renderSim(void)
 	mu.ortho(m_viewport1[0], m_viewport1[0] + m_viewport1[2] - 1, 
 			m_viewport1[1], m_viewport1[1] + m_viewport1[3] - 1, -1, 1);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
-
-	float fontsize = 0.5;
-	string txtString = { "Center text" };
-	// next line = (screen center) - (number of chars * size of one char * fontsize)
-	int posTx = (m_viewport1[0] + m_viewport1[2] * 0.5) - (txtString.length()*20*fontsize);
-	TextCommand textCmd = { txtString, {posTx, 200}, fontsize }; 
 
 	if (!pause && !gameOver) {
 		// Render energy
