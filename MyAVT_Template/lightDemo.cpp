@@ -224,7 +224,7 @@ bool spotlight_mode = false;
 SpotLight droneHeadlights[2]; // two headlights
 
 // City
-int rows = 14; // number of rows
+int rows = 13; // number of rows
 int cols = 14; // number of columns
 float gap = 20.0f;
 float offsetX = -((cols - 1) * (10.0f + gap)) / 2.0f;
@@ -1363,12 +1363,9 @@ void drawSceneObjects(bool shadowMode){
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
 
-		//mu.translate(gmu::MODEL, 0.5f, 0.5f, 1.0f);
-
 		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
 		mu.rotate(gmu::MODEL, package.rotation[0], 1.0f, 0.0f, 0.0f);
 		mu.rotate(gmu::MODEL, package.rotation[2], 0.0f, 0.0f, 1.0f);
-		//mu.translate(gmu::MODEL, -0.5f, -0.5f, -1.0f);
 
 		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
@@ -2153,48 +2150,64 @@ void buildScene()
 
 	// --- INITIALIZE BUILDINGS ---
 	buildings.clear();
-	for (int r = 0; r < rows; ++r)
-	{
-		for (int c = 0; c < cols; ++c)
-		{
+	for (int r = 0; r < rows; ++r) {
+		for (int c = 0; c < cols; ++c) {
+
 			float x = offsetX + c * (buildingW + gap);
 			float z = offsetZ + r * (buildingD + gap);
 
-			bool isStreet = false;
-			// create vertical street down the middle
-			if (c == cols / 2)
-				isStreet = true;
-			// create horizontal street across middle
-			if (r == rows / 2)
-				isStreet = true;
+			bool isQuadrantI = (r < rows / 2 && c < cols / 2);    // top-left
+			bool isQuadrantII = (r < rows / 2 && c >= cols / 2);  // top-right
+			bool isQuadrantIII = (r >= rows / 2 && c < cols / 2); // bottom-left
+			bool isQuadrantIV = (r >= rows / 2 && c >= cols / 2); // bottom-right
 
-			// carve out the central garden area
+			if (isQuadrantI) {
+				buildingHeights[r][c] = 0.0f;
+				continue;
+			}
+
+			// Skip streets and garden
+			int streetWidth = 1;
+			bool isStreet = (r >= rows/2 - streetWidth && r <= rows/2 + streetWidth) ||
+							(c >= cols/2 - streetWidth && c <= cols/2 + streetWidth);
+
 			int gardenRowStart = rows / 2 - gardenSizeRows / 2;
 			int gardenRowEnd = gardenRowStart + gardenSizeRows - 1;
 			int gardenColStart = cols / 2 - gardenSizeCols / 2;
 			int gardenColEnd = gardenColStart + gardenSizeCols - 1;
-			bool isGardenCell = (r >= gardenRowStart && r <= gardenRowEnd && c >= gardenColStart && c <= gardenColEnd);
+			bool isGardenCell = (r >= gardenRowStart && r <= gardenRowEnd &&
+								c >= gardenColStart && c <= gardenColEnd);
 
-			if (!isStreet && !isGardenCell)
-			{
-				Building b;
-				b.position[0] = x;
-				b.position[2] = z;
-				b.width = buildingW;
-				b.depth = buildingD;
-				b.row = r;
-				b.col = c;
-				b.aabb = allMeshes.cube.aabb;
-
-				buildings.push_back(b);
-
-				buildingHeights[r][c] = std::max((rand() % 20) + 15.0f, 20.0f);
-			}
-			else
-			{
-				// leave empty
+			if (isStreet || isGardenCell) {
 				buildingHeights[r][c] = 0.0f;
+				continue;
 			}
+
+			Building b;
+			b.position[0] = x;
+			b.position[2] = z;
+			b.width = buildingW;
+			b.depth = buildingD;
+			b.row = r;
+			b.col = c;
+			b.aabb = allMeshes.cube.aabb;
+
+			if (isQuadrantII) {
+				// Tall skyscrapers, maybe spaced regularly
+				buildingHeights[r][c] = 25.0f + rand() % 16;
+			} else if (isQuadrantIII) {
+				// Houses: lower height and maybe irregular spacing
+				buildingHeights[r][c] = 5.0f + rand() % 6; // 5–10
+				b.width = buildingW + 10;
+				b.depth = buildingD + 10;
+				if ((r+c) % 3 == 0) continue;
+			} else if (isQuadrantIV) {
+				// Dense medium buildings
+				buildingHeights[r][c] = 15.0f + rand() % 11;
+			}
+
+			if (buildingHeights[r][c] > 0.0f)
+				buildings.push_back(b);
 		}
 	}
 
