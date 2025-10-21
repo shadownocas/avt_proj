@@ -23,6 +23,8 @@ out vec2 tex_coord;    // texture coordinates
 out vec3 skyboxTexCoord;
 out vec3 eyeDir;
 out vec3 reflectedDir;
+out vec3 tangent1;    // tangent in eye space
+out float tangentSign;
 
 void main() {
     // Transform vertex position to eye space
@@ -42,7 +44,6 @@ void main() {
     // Output eye-space position
     posEye = posEye4.xyz;
 
-
     // Compute vector toward camera (eye-space)
     // Eye is at origin in eye space, so vector = -posEye
     eye = normalize(-posEye4.xyz);
@@ -55,6 +56,10 @@ void main() {
 
     skyboxTexCoord = vec3(m_Model * position); // since translation is canceled, this works
     skyboxTexCoord.x = -skyboxTexCoord.x; // if needed to fix orientation
+
+    // Transform tangent to eye space
+    tangent1 = normalize(m_normal * tangent.xyz);
+    tangentSign = tangent.w;
 
     if (texMode == 15) {
         reflectedDir = vec3(transpose(m_View) * vec4(vec3(reflect(-eyeDir, normal1)), 0.0)); //reflection vector in world coord

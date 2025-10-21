@@ -37,6 +37,8 @@ in vec2 tex_coord;    // texture coordinates
 in vec3 skyboxTexCoord;
 in vec3 eyeDir;
 in vec3 reflectedDir;
+in vec3 tangent1;     // tangent in eye space
+in float tangentSign;
 
 uniform Materials mat;
 uniform float alpha_threshold;  // for transparency cutoff
@@ -127,8 +129,16 @@ void main() {
     vec3 V = normalize(eye); // eye-space view vector
     vec3 intensity = mat.ambient.rgb; // start with ambient
 
-    if (texMode == 3)
+    if (texMode == 3) {
         n = normalize(2.0 * texture(texmap15, tex_coord).rgb -1.0);
+        vec3 nm = texture(texmap15, tex_coord).rgb;
+        vec3 nt = normalize(2.0 * nm - 1.0);
+
+        vec3 t = normalize(tangent1);
+        vec3 b = normalize(tangentSign * cross(normal1, t));
+        mat3 TBN = mat3(t, b, normal1);
+       n = normalize(TBN * nt);
+    }
     else 
         n = normalize(normal1);
 
