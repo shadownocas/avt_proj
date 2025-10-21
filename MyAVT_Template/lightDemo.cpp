@@ -1769,6 +1769,12 @@ void renderSim(void)
 			m_viewport1[1], m_viewport1[1] + m_viewport1[3] - 1, -1, 1);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
+	float fontsize = 0.5;
+	string txtString = { "Center text" };
+	// next line = (screen center) - (number of chars * size of one char * fontsize)
+	int posTx = (m_viewport1[0] + m_viewport1[2] * 0.5) - (txtString.length()*20*fontsize);
+	TextCommand textCmd = { txtString, {posTx, 200}, fontsize }; 
+
 	if (!pause && !gameOver) {
 		// Render energy
 		int maxEnergy = 5;
@@ -1802,41 +1808,43 @@ void renderSim(void)
 		position = {  static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.87) - (pointsStr.length()*20*energyFontSize), startY };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(pointsStr, position.data(), color.data(), energyFontSize);
-
 	}
 
 	if (gameWin) {
 		std::string gameOverStr = "YOU WON!";
-		position = { m_viewport1[2] - m_viewport1[2] * 0.70f,  m_viewport1[3] - m_viewport1[3] * 0.6f };
-		color = { 1.0f, 0.0f, 0.0f, 1.0f };
-		renderText(gameOverStr, position.data(), color.data(), 2.0f);
+		float gameWonSize = WinY * 0.001;
+		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (gameOverStr.length()*20*gameWonSize),  static_cast<float>(WinY * 0.822) };
+		color = { 0.0f, 1.0f, 0.0f, 1.0f };
+		renderText(gameOverStr, position.data(), color.data(), gameWonSize);
 
 		std::string pointsStr = "Points: " + std::to_string(finalScore);
-		position = { m_viewport1[2] - m_viewport1[2] * 0.58f,  m_viewport1[3] - m_viewport1[3] * 0.7f };
+		float pointFontSize = 0.001f * (WinY); 
+		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (pointsStr.length()*15*pointFontSize), static_cast<float>(WinY * 0.822 - WinY * 0.3)};
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		renderText(pointsStr, position.data(), color.data(), 1.0f);
+		renderText(pointsStr, position.data(), color.data(), pointFontSize);
 	}
 
 	if (gameOver) {
 		std::string gameOverStr = "GAME OVER";
-		position = { m_viewport1[2] - m_viewport1[2] * 0.80f,  m_viewport1[3] - m_viewport1[3] * 0.6f };
+		float gameOverStrSize = 2.0f;
+		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (gameOverStr.length()*20*gameOverStrSize),  m_viewport1[3] - m_viewport1[3] * 0.6f  };
 		color = { 1.0f, 0.0f, 0.0f, 1.0f };
-		renderText(gameOverStr, position.data(), color.data(), 2.0f);
+		renderText(gameOverStr, position.data(), color.data(), gameOverStrSize);
 	}
 
 	if (pause && !gameOver && !gameWin) {
 		std::string pauseStr = "PAUSE";
-		position = { m_viewport1[2] - m_viewport1[2] * 0.60f,  m_viewport1[3] - m_viewport1[3] * 0.6f };
+		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (pauseStr.length()*20*2.0f),  m_viewport1[3] - m_viewport1[3] * 0.6f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(pauseStr, position.data(), color.data(), 2.0f);
 
 		std::string resumeStr = "Press P to resume";
-		position = { m_viewport1[2] - m_viewport1[2] * 0.65f,   m_viewport1[3] - m_viewport1[3] * 0.5f };
+		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - static_cast<float>(resumeStr.length()*20*0.9),   m_viewport1[3] - m_viewport1[3] * 0.5f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(resumeStr, position.data(), color.data(), 1.0f);
 
 		std::string restartStr = "Press R to restart";
-		position = { m_viewport1[2] - m_viewport1[2] * 0.65f,   m_viewport1[3] - m_viewport1[3] * 0.6f };
+		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - static_cast<float>(restartStr.length()*20*0.9),   m_viewport1[3] - m_viewport1[3] * 0.6f };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(restartStr, position.data(), color.data(), 1.0f);
 	}
