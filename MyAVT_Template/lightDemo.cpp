@@ -569,13 +569,13 @@ void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZ
 }
 
 void manageBattery(float dt){
-	float drainRate = 1.0f;
+	float drainRate = 0.33f;
 	drone.battery -= (drone.speed / 4.0f) * drainRate * dt; //4 is max speed FIX
 
 	if (drone.battery < 0.0f) drone.battery = 0.0f;
 
 	if (restart) {
-		drone.battery = 300.0f;
+		drone.battery = 100.0f;
 		restart = false;
 		collisionPackage = false;
 		restartDrone();
@@ -1409,14 +1409,13 @@ void drawSceneObjects(bool shadowMode){
 }
 
 void drawRearViewMirror() {
-const float MIRROR_WIDTH_RATIO  = 0.25f; 
-const float MIRROR_HEIGHT_RATIO = 0.30f;
+	const float MIRROR_WIDTH_RATIO  = 0.25f; 
+	const float MIRROR_HEIGHT_RATIO = 0.30f;
 
-int MIRROR_WIDTH  = static_cast<int>(WinX * MIRROR_WIDTH_RATIO);
-int MIRROR_HEIGHT = static_cast<int>(WinY * MIRROR_HEIGHT_RATIO);
-int MIRROR_X      = static_cast<int>(WinX - MIRROR_WIDTH * 0.8);
-int MIRROR_Y      = static_cast<int>(WinY - MIRROR_HEIGHT * 0.8);
-
+	int MIRROR_WIDTH  = static_cast<int>(WinX * MIRROR_WIDTH_RATIO);
+	int MIRROR_HEIGHT = static_cast<int>(WinY * MIRROR_HEIGHT_RATIO);
+	int MIRROR_X      = static_cast<int>(WinX - MIRROR_WIDTH * 0.8);
+	int MIRROR_Y      = static_cast<int>(WinY - MIRROR_HEIGHT * 0.8);
 
 	glEnable(GL_DEPTH_TEST);
 
@@ -1774,26 +1773,35 @@ void renderSim(void)
 		// Render energy
 		int maxEnergy = 5;
 		int currentEnergy = static_cast<int>((drone.battery / 100.0f) * maxEnergy + 0.5f);
-		float startX = 50, startY = 50, spacing = 40;
-		for (int i = 0; i < maxEnergy; ++i) {
-			std::string str = (i < currentEnergy) ? "H" : " ";
-			position = { startX + i * spacing, startY };
-			color = { 1.0f, 1.0f, 0.0f, 1.0f };
-			renderText(str, position.data(), color.data(), 1.0f);
-		}
+		float energyFontSize = 0.001f * (WinY); 
+		float startY = WinY * 0.1f;
 
-		// Energy percentage text
-		char energyStr[32];
-		sprintf(energyStr, "%.0f%%", drone.battery);
-		position  = { startX + maxEnergy * spacing + 40, startY + 80 };
+		std::string batteryBar = "[";
+		for (int i = 0; i < maxEnergy; ++i) {
+			batteryBar += (i < currentEnergy) ? "#" : "-";
+		}
+		batteryBar += "]";
+		std::vector<float> color;
+		if (drone.battery > 60.0f) color = { 0.0f, 1.0f, 0.0f, 1.0f }; // green
+		else if (drone.battery > 30.0f) color = { 1.0f, 1.0f, 0.0f, 1.0f }; // yellow
+		else color = { 1.0f, 0.0f, 0.0f, 1.0f }; // red
+
+		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.02), startY };
+		renderText(batteryBar, position.data(), color.data(), energyFontSize);
+
+		char energyBuf[32];
+		sprintf(energyBuf, "%.1f%%", drone.battery);
+		std::string energyStr = energyBuf;
+		float batterybarOffset = static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.02);
+		position  = { batterybarOffset + batteryBar.length()*40*energyFontSize , startY };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		renderText(energyStr, position.data(), color.data(), 0.5f);
+		renderText(energyStr, position.data(), color.data(), energyFontSize);
 
 		// Render points
 		std::string pointsStr = "Points: " + std::to_string(finalScore);
-		position = { static_cast<float>(m_viewport1[2]) - 300, 120 };
+		position = {  static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.87) - (pointsStr.length()*20*energyFontSize), startY };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		renderText(pointsStr, position.data(), color.data(), 0.5f);
+		renderText(pointsStr, position.data(), color.data(), energyFontSize);
 
 	}
 
@@ -1895,6 +1903,7 @@ void processKeys(unsigned char key, int xx, int yy)
 		restart = true;
 		pause = false;
 		gameOver = false;
+		gameWin = false;
 		break;
 	case '1':
 		activeCam = 0;
@@ -2232,7 +2241,7 @@ void buildScene()
 		drone.direction[2] = -1.0f;
 		drone.aabb = allMeshes.cube.aabb;
 
-		drone.battery = 300.0f;
+		drone.battery = 100.0f;
 		drone.points = 0;
 	}
 
