@@ -246,6 +246,12 @@ void main() {
 		vec3 final_rgb = max(intensity3 * aux_color.rgb + spec.rgb, 0.1 * aux_color.rgb);
 		colorOut = vec4(final_rgb, 1.0);
 	}
+    else if (texMode == 17) {
+        texel = texture(texmap12, tex_coord);
+		if((texel.a == 0.0)  || (mat.diffuse.a == 0.0) ) discard;
+	    else
+			colorOut = vec4(mat.diffuse * texel); 
+    }
     else {
         texel = texture(texmap, tex_coord); // base floor
         vec3 finalTexture = texel.rgb;

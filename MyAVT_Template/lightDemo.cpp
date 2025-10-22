@@ -168,6 +168,7 @@ struct Billboard {
 struct Particle {
 	float	life;		// vida
 	float	fade;		// fade
+	float	r, g, b;    // color
 	GLfloat x, y, z; 
 	GLfloat vx, vy, vz; // velocity 
 	GLfloat ax, ay, az; // aceleration
@@ -417,6 +418,10 @@ void iniParticles(void)
         particles[i].ax = 0.1f;
         particles[i].ay = -0.15f;
         particles[i].az = 0.0f;
+
+		particles[i].r = 1.0f;
+		particles[i].g = 0.5f;
+		particles[i].b = 0.0f;
 
         particles[i].life = 1.0f;
         particles[i].fade = 0.0025f;
@@ -983,7 +988,7 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 
-		data.mesh = &allMeshes.quad;
+		data.mesh = &allMeshes.quad[0];
 		data.texMode = flare->element[idx].textureId;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1086,7 +1091,7 @@ void draw_floor(){
 	AABB aabbBox = updateGlobalAABB(floorObj.aabb, modelMatrix);
 	floorObj.worldAABB = aabbBox;
 
-	data.mesh = &allMeshes.quad;
+	data.mesh = &allMeshes.quad[0];
 	data.texMode = 20; //multitexture
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1262,7 +1267,7 @@ void drawSceneObjects(bool shadowMode){
 		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
-		data.mesh = &allMeshes.quad;
+		data.mesh = &allMeshes.quad[0];
 		data.texMode = 5;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1274,7 +1279,7 @@ void drawSceneObjects(bool shadowMode){
 	// --- Draw trees ---
 	for (Billboard &tree : billboards) {
         mu.pushMatrix(gmu::MODEL);
-        mu.translate(gmu::MODEL, tree.position[0], tree.position[1] /* + tree.scale[1] * 0.3 */, tree.position[2]);
+        mu.translate(gmu::MODEL, tree.position[0], tree.position[1], tree.position[2]);
         mu.scale(gmu::MODEL, tree.scale[0], tree.scale[1], tree.scale[2]);
 
 		turnBillBoard(cams[2].camPos, tree.position);
@@ -1286,7 +1291,7 @@ void drawSceneObjects(bool shadowMode){
 		AABB aabbBox = updateGlobalAABB(tree.aabb, modelMatrix);
 		tree.worldAABB = aabbBox;
 
-       	data.mesh = &allMeshes.quad;	
+       	data.mesh = &allMeshes.quad[0];	
 		data.texMode = tree.textureID;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1479,7 +1484,7 @@ void drawRearViewMirror() {
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
 	dataMesh data;
-	data.mesh = &allMeshes.quad;
+	data.mesh = &allMeshes.quad[0];
 	data.texMode = 1;
 	data.vm = mu.get(gmu::VIEW_MODEL);
 	data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1746,29 +1751,28 @@ void renderSim(void)
         glDisable(GL_BLEND); */
     }
 
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
+	
 	// ----- RENDER PARTICLES -----
 	if(fireworks){
-
 		updateParticles();
 
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_CULL_FACE);
 		glDepthMask(GL_FALSE);
-		glEnable(GL_DEPTH_TEST);
-
-		dataMesh data;
-		data.mesh = &allMeshes.sphere[1];
-		data.texMode = 5;
+		glDisable(GL_DEPTH_TEST);
 
 		for (int i = 0; i < MAX_PARTICULAS; ++i) {
+			dataMesh data;
+			float diffuse[] = {particles[i].r, particles[i].g, particles[i].b, particles[i].life};
+			memcpy(allMeshes.quad[1].mat.diffuse, diffuse, 4 * sizeof(float));
+			data.mesh = &allMeshes.quad[1];
+			data.texMode = 17; //particles
 			if (particles[i].life > 0.0f) {
 				
 				mu.pushMatrix(gmu::MODEL);
-				mu.translate(gmu::MODEL, particles[i].x, particles[i].y, particles[i].z);
-				mu.scale(gmu::MODEL, 0.05f, 0.05f, 0.05f); 
+				mu.translate(gmu::MODEL,particles[i].x, particles[i].y, particles[i].z);
+				mu.scale(gmu::MODEL, 0.2f, 0.2f, 0.2f); 
 
 				mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 				mu.computeNormalMatrix3x3();
@@ -1785,8 +1789,10 @@ void renderSim(void)
 			}
 		}
 
-		glDepthMask(GL_TRUE);
 		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
+		glDepthMask(GL_TRUE);
+		glEnable(GL_CULL_FACE);
 
 		if (dead_num_particles == MAX_PARTICULAS) {
 			fireworks = false;
@@ -1799,24 +1805,23 @@ void renderSim(void)
 	std::array<float, 2> position;
 	std::array<float, 4> color;
 
-	glDisable(GL_DEPTH_TEST);
 	drawRearViewMirror();
 
-	glEnable(GL_BLEND);  
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	int m_viewport1[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport1);
-
 	// Save current matrices
 	mu.pushMatrix(gmu::MODEL);
 	mu.pushMatrix(gmu::VIEW);
 	mu.pushMatrix(gmu::PROJECTION);
 
-	// Setup ortho for HUD
 	mu.loadIdentity(gmu::MODEL);
 	mu.loadIdentity(gmu::VIEW);
 	mu.loadIdentity(gmu::PROJECTION);
+
 	mu.ortho(m_viewport1[0], m_viewport1[0] + m_viewport1[2] - 1, 
 			m_viewport1[1], m_viewport1[1] + m_viewport1[3] - 1, -1, 1);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
@@ -1900,8 +1905,8 @@ void renderSim(void)
 	mu.popMatrix(gmu::VIEW);
 	mu.popMatrix(gmu::MODEL);
 
-	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
 
 	glutSwapBuffers();
 }
@@ -2089,7 +2094,6 @@ void buildScene()
     renderer.TexObjArray.texture2D_Loader("assets/sun.tga");   // 12
     renderer.TexObjArray.texture2D_Loader("assets/water.tga"); // 13
 
-    //const char *filenames[] = { "assets/posx.jpg","assets/negx.jpg","assets/posy.jpg","assets/negy.jpg","assets/posz.jpg","assets/negz.jpg" };
 	const char *filenames[] = { "assets/right.jpg", "assets/left.jpg", "assets/top.jpg", "assets/bottom.jpg", "assets/front.jpg", "assets/back.jpg" };
     renderer.TexObjArray.textureCubeMap_Loader(filenames);
 	renderer.TexObjArray.texture2D_Loader("assets/normal.tga"); //15
@@ -2130,13 +2134,21 @@ void buildScene()
 	int texcount = 0;
 
 	// Quad
-	allMeshes.quad = createQuad(1, 1);
-	memcpy(allMeshes.quad.mat.ambient, amb, 4 * sizeof(float));
-	memcpy(allMeshes.quad.mat.diffuse, diff, 4 * sizeof(float));
-	memcpy(allMeshes.quad.mat.specular, spec, 4 * sizeof(float));
-	memcpy(allMeshes.quad.mat.emissive, emissive, 4 * sizeof(float));
-	allMeshes.quad.mat.shininess = shininess;
-	allMeshes.quad.mat.texCount = texcount;
+	allMeshes.quad[0] = createQuad(1, 1);
+	memcpy(allMeshes.quad[0].mat.ambient, amb, 4 * sizeof(float));
+	memcpy(allMeshes.quad[0].mat.diffuse, diff, 4 * sizeof(float));
+	memcpy(allMeshes.quad[0].mat.specular, spec, 4 * sizeof(float));
+	memcpy(allMeshes.quad[0].mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.quad[0].mat.shininess = shininess;
+	allMeshes.quad[0].mat.texCount = texcount;
+
+	allMeshes.quad[1] = createQuad(1, 1);
+	memcpy(allMeshes.quad[1].mat.ambient, amb, 4 * sizeof(float));
+	memcpy(allMeshes.quad[1].mat.diffuse, diff, 4 * sizeof(float));
+	memcpy(allMeshes.quad[1].mat.specular, spec, 4 * sizeof(float));
+	memcpy(allMeshes.quad[1].mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.quad[1].mat.shininess = shininess;
+	allMeshes.quad[1].mat.texCount = texcount;
 
 	// Cube
 	allMeshes.cube[0] = createCube();
@@ -2311,7 +2323,7 @@ void buildScene()
         tree.scale[1] = 20.0f;
         tree.scale[2] = 20.0f;
 		tree.textureID = 7;
-        tree.aabb = allMeshes.quad.aabb;
+        tree.aabb = allMeshes.quad[0].aabb;
 
        	billboards.push_back(tree);
     }
@@ -2325,7 +2337,7 @@ void buildScene()
         tree.scale[1] = 20.0f;
         tree.scale[2] = 20.0f;
 		tree.textureID = 7;
-        tree.aabb = allMeshes.quad.aabb;
+        tree.aabb = allMeshes.quad[0].aabb;
 
        	billboards.push_back(tree);
 	}
@@ -2353,7 +2365,7 @@ void buildScene()
 		package.aabb = allMeshes.cube[0].aabb;
 	}
 
-	floorObj.aabb = allMeshes.quad.aabb;
+	floorObj.aabb = allMeshes.quad[0].aabb;
 
 	cams[0].camPos[1] = 100.0;
 	cams[0].camPos[0] = 0.0;
