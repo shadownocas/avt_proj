@@ -1932,7 +1932,8 @@ void processKeys(unsigned char key, int xx, int yy)
 		break;
 	case 'p':
 		printf("paused game!\n");
-		pause = !pause;
+		if(!gameWin)
+			pause = !pause;
 		break;
 	case 'R':
 	case 'r':
