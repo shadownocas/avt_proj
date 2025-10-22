@@ -767,7 +767,7 @@ void updatePackage(float dt) {
     float pivotZ = drone.position[2];
 
     float yawRad   = mu.DegToRad(drone.rotation[1]);
-    float pitchRad = mu.DegToRad(followPitchOffsetDeg); //FIX
+    float pitchRad = mu.DegToRad(followPitchOffsetDeg);
 
     float offsetX = sinf(yawRad) * cosf(pitchRad);
     float offsetY = sinf(pitchRad);
@@ -1245,6 +1245,22 @@ void drawSceneObjects(bool shadowMode){
 			mu.popMatrix(gmu::MODEL);
 		}
 
+		mu.popMatrix(gmu::MODEL);
+	}
+	// --- Draw garden top---
+	{
+		mu.pushMatrix(gmu::MODEL);
+		mu.translate(gmu::MODEL, -125, 0.3f, -180);
+		mu.scale(gmu::MODEL, 200, 1.0f, 45);
+		mu.rotate(gmu::MODEL, -90.0f, 1.0f, 0.0f, 0.0f);
+		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+		mu.computeNormalMatrix3x3();
+		data.mesh = &allMeshes.quad;
+		data.texMode = 5;
+		data.vm = mu.get(gmu::VIEW_MODEL);
+		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+		data.normal = mu.getNormalMatrix();
+		renderer.renderMesh(data);
 		mu.popMatrix(gmu::MODEL);
 	}
 
@@ -2280,6 +2296,22 @@ void buildScene()
 
        	billboards.push_back(tree);
     }
+	for (int t = 0; t < 4; ++t){
+		Billboard tree;
+        tree.position[0] = -80 - 40*t;
+        tree.position[1] = 10.0f;
+        tree.position[2] = -180;
+
+        tree.scale[0] = 20.0f;
+        tree.scale[1] = 20.0f;
+        tree.scale[2] = 20.0f;
+		tree.textureID = 7;
+        tree.aabb = allMeshes.quad.aabb;
+
+       	billboards.push_back(tree);
+	}
+
+	mu.translate(gmu::MODEL, -125, 0.3f, -180);
 
 	// --- INITIALIZE DRONE ---
 	{
