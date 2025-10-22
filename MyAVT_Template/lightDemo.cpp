@@ -803,9 +803,6 @@ bool collision(){
 					return false;
 				}
 			}
-
-			fireworks = true;
-			iniParticles();
 			collisionDetected = true;
 		}
 	}
@@ -884,6 +881,9 @@ void update(){
 					pause = true;
 					gameOver = true;
 				}
+
+				fireworks = true;
+				iniParticles();
 			} else {
 				updateDrone(dt); // Normal movement
 			}
