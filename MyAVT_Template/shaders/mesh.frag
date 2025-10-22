@@ -234,12 +234,11 @@ void main() {
         colorOut = vec4(cubeColor, 1.0);
     }
     else if (texMode == 15) { // Environmental cube mapping
-		vec4 cube_texel = texture(texmap14, reflectedDir); // interpolated reflected vector from vertex shader
+		vec4 cube_texel = texture(texmap14, reflectedDir);
 		vec3 intensity3 = vec3(intensity); // vec3 intensity
 		texel = texture(texmap4, tex_coord);  // texel from metal.tga
 		vec4 aux_color = mix(texel, cube_texel, reflect_factor);
 		
-		// Calculate final color using component-wise operations
 		vec3 final_rgb = max(intensity3 * aux_color.rgb + spec.rgb, 0.1 * aux_color.rgb);
 		colorOut = vec4(final_rgb, 1.0);
 	}
@@ -250,7 +249,7 @@ void main() {
 			colorOut = vec4(mat.diffuse * texel); 
     }
     else {
-        texel = texture(texmap, tex_coord); // base floor
+        texel = texture(texmap, tex_coord);
         vec3 finalTexture = texel.rgb;
 
         vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
@@ -283,7 +282,6 @@ void main() {
         float lakeStartV = (lakeCenterZ - lakeD/2.0) / floorDepth;
         float lakeEndV   = (lakeCenterZ + lakeD/2.0) / floorDepth;
 
-        // --- Priority order: lake > garden > road stripe ---
         if (tex_coord.x > lakeStartU && tex_coord.x < lakeEndU &&
             tex_coord.y > lakeStartV && tex_coord.y < lakeEndV) {
 
@@ -321,11 +319,10 @@ void main() {
                 vec2 stripeUV = vec2(stripeU, tex_coord.y);
                 finalTexture = texture(texmap6, stripeUV).rgb;
 
-        vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
-        colorOut = vec4(finalColor, 1.0);
-    }
-}
-
+                vec3 finalColor = max(intensity * finalTexture + spec.rgb, 0.07 * texel.rgb);
+                colorOut = vec4(finalColor, 1.0);
+            }
+        }
     }
     
     // Fog

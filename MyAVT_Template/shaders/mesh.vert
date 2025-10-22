@@ -54,8 +54,8 @@ void main() {
     // Compute clip-space position for rasterization
     gl_Position = m_pvm * position;
 
-    skyboxTexCoord = vec3(m_Model * position); // since translation is canceled, this works
-    skyboxTexCoord.x = -skyboxTexCoord.x; // if needed to fix orientation
+    skyboxTexCoord = vec3(m_Model * position);
+    skyboxTexCoord.x = -skyboxTexCoord.x;
 
     // Transform tangent to eye space
     tangent1 = normalize(m_normal * tangent.xyz);
