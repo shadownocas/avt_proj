@@ -219,13 +219,10 @@ void main() {
         else
             texel = vec4(1.0);
 
-        vec4 finalColor = texel * mat.diffuse;
-
-        if (finalColor.a < 0.2)
-            discard;
-
-        colorOut = finalColor;
-        return;
+        float alpha = texel.a;
+        float smoothOut = smoothstep(0.0, 1.0, alpha);
+        vec3 color = texel.rgb * smoothOut;
+        colorOut = vec4(color, smoothOut);
     }
     else if (texMode == 13) {
         // Shadow: black color with slight transparency
