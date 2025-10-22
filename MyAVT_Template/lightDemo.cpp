@@ -61,9 +61,8 @@ Renderer renderer;
 float followYawOffsetDeg = 0.f;
 float followPitchOffsetDeg = 15.f; // slight downward tilt by default
 
-// Zoom sensitivity (world units per pixel of RMB drag)
-float zoomCam1 = 200.0f;  // start height for top view
-float zoomCam2 = 60.0f;   // ortho size
+float zoomCam1 = 200.0f;
+float zoomCam2 = 100.0f;
 
 int prevX = 0, prevY = 0;
 
@@ -112,7 +111,7 @@ struct FlyingObject
 	float speed;
 	float rotationAngle;
 	float rotationSpeed;
-	int meshID; // which geometry primitive to use
+	int meshID;
 	bool active;
 	AABB aabb;
 	AABB worldAABB;
@@ -272,7 +271,7 @@ int finalScore = 0;
 
 //Flare effect
 FLARE_DEF AVTflare; 
-float lightScreenPos[3];  //Position of the light in Window Coordinates
+float lightScreenPos[3];
 
 //Shadow effect
 bool shadowMode = false;
@@ -582,8 +581,8 @@ void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZ
 }
 
 void manageBattery(float dt){
-	float drainRate = 0.15f;
-	drone.battery -= (drone.speed / 4.0f) * drainRate * dt; //4 is max speed FIX
+	float drainRate = 0.10f;
+	drone.battery -= (drone.speed / 4.0f) * drainRate * dt;
 
 	if (drone.battery < 0.0f) drone.battery = 0.0f;
 
@@ -1208,13 +1207,6 @@ void drawSceneObjects(bool shadowMode){
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3();
 
-		float* modelMatrix = mu.get(gmu::MODEL);
-		AABB droneBox = updateGlobalAABB(drone.aabb, modelMatrix);
-		if (collisionPackage){
-			drone.worldAABB = mergeAABBs( droneBox , package.worldAABB);
-		} else {
-			drone.worldAABB = updateGlobalAABB(drone.aabb, modelMatrix);
-		}
 
 		data.mesh = &allMeshes.cube[0];
 		data.texMode = shadowMode ? 13 : 4;
@@ -1256,6 +1248,40 @@ void drawSceneObjects(bool shadowMode){
 			renderer.renderMesh(data);
 
 			mu.popMatrix(gmu::MODEL);
+		}
+
+		if (collisionPackage) {
+			mu.pushMatrix(gmu::MODEL);
+			mu.translate(gmu::MODEL, 0.0, -(1 + bodyHeight * 0.5f), 0.0);                        // center Z
+
+    		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
+
+			mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
+			mu.computeNormalMatrix3x3();
+
+			float* modelMatrix = mu.get(gmu::MODEL);
+			AABB aabbBox = updateGlobalAABB(package.aabb, modelMatrix);
+			package.worldAABB = aabbBox;
+
+			data.mesh = &allMeshes.cube[1];
+			data.texMode = shadowMode ? 13 : 4;
+			data.vm = mu.get(gmu::VIEW_MODEL);
+			data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
+			data.normal = mu.getNormalMatrix();
+			data.view = mu.get(gmu::VIEW);
+			data.model = mu.get(gmu::MODEL);
+
+			renderer.renderMesh(data);
+			mu.popMatrix(gmu::MODEL);
+
+		}
+
+		float* modelMatrix = mu.get(gmu::MODEL);
+		AABB droneBox = updateGlobalAABB(drone.aabb, modelMatrix);
+		if (collisionPackage){
+			drone.worldAABB = mergeAABBs( droneBox , package.worldAABB);
+		} else {
+			drone.worldAABB = updateGlobalAABB(drone.aabb, modelMatrix);
 		}
 
 		mu.popMatrix(gmu::MODEL);
@@ -1400,7 +1426,7 @@ void drawSceneObjects(bool shadowMode){
 
 
 	// --- Draw package ---
-	{ 
+	if (!collisionPackage) { 
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
 
@@ -1674,18 +1700,16 @@ void renderSim(void)
  
 	glEnable(GL_STENCIL_TEST);
 
-	// Step 1: draw floor into stencil (no color)
 	glStencilFunc(GL_NEVER, 1, 0x1);
 	glStencilOp(GL_REPLACE, GL_KEEP, GL_KEEP);
-	draw_floor(); // render floor only for stencil
+	draw_floor();
 
-	// Step 2: draw reflected scene where stencil == 1
 	glStencilFunc(GL_EQUAL, 0x1, 0x1);
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
 	glCullFace(GL_FRONT);
 	mu.pushMatrix(gmu::MODEL);
-	mu.scale(gmu::MODEL, 1.0f, -1.0f, 1.0f); // mirror over floor
+	mu.scale(gmu::MODEL, 1.0f, -1.0f, 1.0f);
 	drawSceneObjects(false);
 	mu.popMatrix(gmu::MODEL);
 	glCullFace(GL_BACK);
@@ -1715,7 +1739,6 @@ void renderSim(void)
 
 	lightPosWorld[0] += -50.0f; // move left
 	lightPosWorld[1] += 50.0f;   // move up to top
-	//lightPosWorld[2] += 100.0f;  // move away
 
 	// Floor plane y = 0
 	float floorPlane[4] = {0, 1, 0, 0};
@@ -1728,7 +1751,9 @@ void renderSim(void)
 
 	mu.pushMatrix(gmu::MODEL);
 	mu.multMatrix(gmu::MODEL, shadowMat);
-	drawSceneObjects(true); // shadowMode = true
+	if (dayMode){
+		drawSceneObjects(true); // shadowMode = true
+	}
 	mu.popMatrix(gmu::MODEL); 
 
 	glEnable(GL_DEPTH_TEST);
@@ -1802,7 +1827,7 @@ void renderSim(void)
 
 	int m_viewport1[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport1);
-	// Save current matrices
+
 	mu.pushMatrix(gmu::MODEL);
 	mu.pushMatrix(gmu::VIEW);
 	mu.pushMatrix(gmu::PROJECTION);
@@ -1889,7 +1914,6 @@ void renderSim(void)
 		renderText(pointsStr, position.data(), color.data(), energyFontSize);
 	}
 
-	// Restore original matrices
 	mu.popMatrix(gmu::PROJECTION);
 	mu.popMatrix(gmu::VIEW);
 	mu.popMatrix(gmu::MODEL);
@@ -1921,20 +1945,20 @@ void processKeys(unsigned char key, int xx, int yy)
 	case 27:
 		glutLeaveMainLoop();
 		break;
-
+	case 'H':
 	case 'h':
 		spotlight_mode = !spotlight_mode;
 		printf("Spot light %s\n", spotlight_mode ? "ON" : "OFF");
 		break;
-
+	case 'C':
 	case 'c': // toggle lamp posts
 		lampsOn = !lampsOn;
 		printf("Lamp posts %s\n", lampsOn ? "ON" : "OFF");
 		break;
-
+	case 'N':
 	case 'n':
 		dayMode = !dayMode;
-		printf("Ambient Light %s\n", spotlight_mode ? "ON" : "OFF");
+		printf("Ambient Light %s\n", dayMode ? "ON" : "OFF");
 		break;
 	
 	case 'f':
@@ -1942,6 +1966,7 @@ void processKeys(unsigned char key, int xx, int yy)
 		gFogOn = !gFogOn;
 		printf("Fog %s\n", gFogOn ? "ON" : "OFF");
 		break;
+	case 'P':
 	case 'p':
 		printf("paused game!\n");
 		if(!gameWin)
@@ -2260,16 +2285,13 @@ void buildScene()
 			b.aabb = allMeshes.cube[0].aabb;
 
 			if (isQuadrantII) {
-				// Tall skyscrapers, maybe spaced regularly
 				buildingHeights[r][c] = 25.0f + rand() % 16;
 			} else if (isQuadrantIII) {
-				// Houses: lower height and maybe irregular spacing
 				buildingHeights[r][c] = 5.0f + rand() % 6; // 5–10
 				b.width = buildingW + 10;
 				b.depth = buildingD + 10;
 				if ((r+c) % 3 == 0) continue;
 			} else if (isQuadrantIV) {
-				// Dense medium buildings
 				buildingHeights[r][c] = 15.0f + rand() % 11;
 			}
 
@@ -2457,7 +2479,6 @@ unsigned int getTextureId(char *name) {
     if (strncmp(name, "hxgn", 4) == 0) return 10;  // hexagon
     if (strncmp(name, "ring", 4) == 0) return 11;  // ring
     if (strncmp(name, "sun",  3) == 0) return 12;  // sun core
-	printf("NAO ACHOU!");
     return -1; // unknown
 }
 
