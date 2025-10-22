@@ -763,7 +763,7 @@ void updatePackage(float dt) {
     if (!collisionPackage) return;
 
     float pivotX = drone.position[0];
-    float pivotY = drone.position[1] - 1.0f;
+    float pivotY = drone.position[1] - 1.5f;
     float pivotZ = drone.position[2];
 
     float yawRad   = mu.DegToRad(drone.rotation[1]);
@@ -795,7 +795,7 @@ bool collision(){
 					gameWin = true;
 					finalScore += (int)drone.battery * 10;
 					pause = true;
-					return true;
+					return false;
 				}
 			}
 
@@ -833,6 +833,12 @@ bool collision(){
 	}
 
 	if (checkAABBCollision(drone.worldAABB.aabbmin, drone.worldAABB.aabbmax, package.worldAABB.aabbmin, package.worldAABB.aabbmax)) {
+		if(!collisionPackage){
+			float pushBackDistance = 2.0f;
+			drone.position[0] -= drone.direction[0] * pushBackDistance;
+			drone.position[1] -= drone.direction[1] * pushBackDistance;
+			drone.position[2] -= drone.direction[2] * pushBackDistance;
+		}
 		collisionPackage = true;
 	}
 
@@ -1372,9 +1378,9 @@ void drawSceneObjects(bool shadowMode){
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
 
-		mu.rotate(gmu::MODEL, drone.rotation[1], 0.0f, 1.0f, 0.0f);
-		mu.rotate(gmu::MODEL, drone.rotation[0], 1.0f, 0.0f, 0.0f);
-		mu.rotate(gmu::MODEL, drone.rotation[2], 0.0f, 0.0f, 1.0f);
+		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
+		mu.rotate(gmu::MODEL, package.rotation[0], 1.0f, 0.0f, 0.0f);
+		mu.rotate(gmu::MODEL, package.rotation[2], 0.0f, 0.0f, 1.0f);
 
 		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
