@@ -139,6 +139,7 @@ struct Building
 	float width, depth;
 	int row, col;
 	bool goal = false;
+	bool newTexture = false;
 	AABB aabb;
 	AABB worldAABB;
 };
@@ -253,6 +254,7 @@ float gardenD = gardenHalfD * 2.0f;
 bool flyingColision = false;
 bool collisionPackage = false;
 bool fireworks = false;
+int randomIndex = 0;
 
 // Fog
 bool gFogOn = false;
@@ -422,7 +424,8 @@ void iniParticles(void)
 }
 
 void randomPackagePos(){
-    int randomIndex = rand() % buildings.size();
+	buildings[randomIndex].newTexture = false;
+    randomIndex = rand() % buildings.size();
     Building& chosen = buildings[randomIndex];
 
     int goalIndex;
@@ -431,7 +434,8 @@ void randomPackagePos(){
     } while (goalIndex == randomIndex);
 
     buildings[goalIndex].goal = true;
-	buildings[randomIndex].goal = true;
+    buildings[goalIndex].newTexture= true;
+	buildings[randomIndex].newTexture = true;
 
     float height = buildingHeights[chosen.row][chosen.col];
     package.position[0] = chosen.position[0] + chosen.width / 2.0f - 0.5f; // subtract half package size
@@ -470,6 +474,7 @@ void restartGoal(){
 	for (Building& b : buildings) {
         if (b.goal) {
             b.goal = false;
+			b.newTexture = false;
         }
     }
 }
@@ -758,7 +763,7 @@ void updatePackage(float dt) {
     if (!collisionPackage) return;
 
     float pivotX = drone.position[0];
-    float pivotY = drone.position[1] - 1.5f;
+    float pivotY = drone.position[1] - 1.0f;
     float pivotZ = drone.position[2];
 
     float yawRad   = mu.DegToRad(drone.rotation[1]);
@@ -790,7 +795,7 @@ bool collision(){
 					gameWin = true;
 					finalScore += (int)drone.battery * 10;
 					pause = true;
-					return false;
+					return true;
 				}
 			}
 
@@ -1039,7 +1044,7 @@ void draw_skybox() {
 
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
-	data.mesh   = &allMeshes.cube; 
+	data.mesh = &allMeshes.cube[0];
 	data.texMode = 14;    
 	data.vm     = mu.get(gmu::VIEW_MODEL);
 	data.pvm    = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1150,7 +1155,7 @@ void drawSceneObjects(bool shadowMode){
 		AABB aabbBox = updateGlobalAABB(obj.aabb, modelMatrix);
 		obj.worldAABB = aabbBox;
 
-		data.mesh = &allMeshes.cube;
+		data.mesh = &allMeshes.cube[0];
 		data.texMode = shadowMode ? 13 : 1;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1192,7 +1197,7 @@ void drawSceneObjects(bool shadowMode){
 			drone.worldAABB = updateGlobalAABB(drone.aabb, modelMatrix);
 		}
 
-		data.mesh = &allMeshes.cube;
+		data.mesh = &allMeshes.cube[0];
 		data.texMode = shadowMode ? 13 : 4;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1278,8 +1283,8 @@ void drawSceneObjects(bool shadowMode){
 		AABB aabbBox = updateGlobalAABB(b.aabb, modelMatrix);
 		b.worldAABB = aabbBox;
 
-		data.mesh = &allMeshes.cube;
-		data.texMode = shadowMode ? 13 : (b.goal ? 4 : 3);
+        data.mesh = &allMeshes.cube[0];
+		data.texMode = shadowMode ? 13 : (b.newTexture ? 4 : 3);
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
 		data.normal = mu.getNormalMatrix();
@@ -1345,7 +1350,7 @@ void drawSceneObjects(bool shadowMode){
 		AABB aabbBox = updateGlobalAABB(lamp.aabb, modelMatrix);
 		lamp.worldAABB = aabbBox;
 
-        data.mesh = &allMeshes.cube;
+        data.mesh = &allMeshes.cube[0];
 		data.texMode = shadowMode ? 13 : 4;
         data.vm = mu.get(gmu::VIEW_MODEL);
         data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1367,9 +1372,9 @@ void drawSceneObjects(bool shadowMode){
 		mu.pushMatrix(gmu::MODEL);
 		mu.translate(gmu::MODEL, package.position[0], package.position[1], package.position[2]);
 
-		mu.rotate(gmu::MODEL, package.rotation[1], 0.0f, 1.0f, 0.0f);
-		mu.rotate(gmu::MODEL, package.rotation[0], 1.0f, 0.0f, 0.0f);
-		mu.rotate(gmu::MODEL, package.rotation[2], 0.0f, 0.0f, 1.0f);
+		mu.rotate(gmu::MODEL, drone.rotation[1], 0.0f, 1.0f, 0.0f);
+		mu.rotate(gmu::MODEL, drone.rotation[0], 1.0f, 0.0f, 0.0f);
+		mu.rotate(gmu::MODEL, drone.rotation[2], 0.0f, 0.0f, 1.0f);
 
 		mu.scale(gmu::MODEL, 1.0f, 1.0f, 2.0f);
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
@@ -1379,7 +1384,7 @@ void drawSceneObjects(bool shadowMode){
 		AABB aabbBox = updateGlobalAABB(package.aabb, modelMatrix);
 		package.worldAABB = aabbBox;
 
-		data.mesh = &allMeshes.cube;
+		data.mesh = &allMeshes.cube[1];
 		data.texMode = shadowMode ? 13 : 4;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1400,7 +1405,7 @@ void drawSceneObjects(bool shadowMode){
 		mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 		mu.computeNormalMatrix3x3(); // This is needed for reflection calculation
 
-		data.mesh = &allMeshes.cube;
+		data.mesh = &allMeshes.cube[0];
 		data.texMode = shadowMode ? 13 : 15;
 		data.vm = mu.get(gmu::VIEW_MODEL);
 		data.pvm = mu.get(gmu::PROJ_VIEW_MODEL);
@@ -1646,10 +1651,10 @@ void renderSim(void)
 	glStencilFunc(GL_EQUAL, 0x1, 0x1);
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
-	glCullFace(GL_FRONT); // avoid z-fighting
+	glCullFace(GL_FRONT);
 	mu.pushMatrix(gmu::MODEL);
 	mu.scale(gmu::MODEL, 1.0f, -1.0f, 1.0f); // mirror over floor
-	drawSceneObjects(false); // all drones, flying objects, trees, buildings, package
+	drawSceneObjects(false);
 	mu.popMatrix(gmu::MODEL);
 	glCullFace(GL_BACK);
 
@@ -1776,7 +1781,46 @@ void renderSim(void)
 			m_viewport1[1], m_viewport1[1] + m_viewport1[3] - 1, -1, 1);
 	mu.computeDerivedMatrix(gmu::PROJ_VIEW_MODEL);
 
-	if (!pause && !gameOver) {
+	if (gameWin) {
+		std::string gameOverStr = "YOU WON!";
+		float gameWonSize = WinY * 0.001;
+		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (gameOverStr.length()*20*gameWonSize),  static_cast<float>(WinY * 0.822) };
+		color = { 0.0f, 1.0f, 0.0f, 1.0f };
+		renderText(gameOverStr, position.data(), color.data(), gameWonSize);
+
+		std::string pointsStr = "Points: " + std::to_string(finalScore);
+		float pointFontSize = 0.001f * (WinY); 
+		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (pointsStr.length()*15*pointFontSize), static_cast<float>(WinY * 0.822 - WinY * 0.3)};
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(pointsStr, position.data(), color.data(), pointFontSize);
+	}
+
+	else if (gameOver) {
+		std::string gameOverStr = "GAME OVER";
+		float gameOverStrSize = 2.0f;
+		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (gameOverStr.length()*20*gameOverStrSize),  m_viewport1[3] - m_viewport1[3] * 0.6f  };
+		color = { 1.0f, 0.0f, 0.0f, 1.0f };
+		renderText(gameOverStr, position.data(), color.data(), gameOverStrSize);
+	}
+
+	else if (pause && !gameOver && !gameWin) {
+		std::string pauseStr = "PAUSE";
+		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (pauseStr.length()*20*2.0f),  m_viewport1[3] - m_viewport1[3] * 0.6f };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(pauseStr, position.data(), color.data(), 2.0f);
+
+		std::string resumeStr = "Press P to resume";
+		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - static_cast<float>(resumeStr.length()*20*0.9),   m_viewport1[3] - m_viewport1[3] * 0.5f };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(resumeStr, position.data(), color.data(), 1.0f);
+
+		std::string restartStr = "Press R to restart";
+		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - static_cast<float>(restartStr.length()*20*0.9),   m_viewport1[3] - m_viewport1[3] * 0.6f };
+		color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		renderText(restartStr, position.data(), color.data(), 1.0f);
+	}
+
+	else {
 		// Render energy
 		int maxEnergy = 5;
 		int currentEnergy = static_cast<int>((drone.battery / 100.0f) * maxEnergy + 0.5f);
@@ -1809,45 +1853,6 @@ void renderSim(void)
 		position = {  static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.87) - (pointsStr.length()*20*energyFontSize), startY };
 		color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		renderText(pointsStr, position.data(), color.data(), energyFontSize);
-	}
-
-	if (gameWin) {
-		std::string gameOverStr = "YOU WON!";
-		float gameWonSize = WinY * 0.001;
-		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (gameOverStr.length()*20*gameWonSize),  static_cast<float>(WinY * 0.822) };
-		color = { 0.0f, 1.0f, 0.0f, 1.0f };
-		renderText(gameOverStr, position.data(), color.data(), gameWonSize);
-
-		std::string pointsStr = "Points: " + std::to_string(finalScore);
-		float pointFontSize = 0.001f * (WinY); 
-		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (pointsStr.length()*15*pointFontSize), static_cast<float>(WinY * 0.822 - WinY * 0.3)};
-		color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		renderText(pointsStr, position.data(), color.data(), pointFontSize);
-	}
-
-	if (gameOver) {
-		std::string gameOverStr = "GAME OVER";
-		float gameOverStrSize = 2.0f;
-		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (gameOverStr.length()*20*gameOverStrSize),  m_viewport1[3] - m_viewport1[3] * 0.6f  };
-		color = { 1.0f, 0.0f, 0.0f, 1.0f };
-		renderText(gameOverStr, position.data(), color.data(), gameOverStrSize);
-	}
-
-	if (pause && !gameOver && !gameWin) {
-		std::string pauseStr = "PAUSE";
-		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - (pauseStr.length()*20*2.0f),  m_viewport1[3] - m_viewport1[3] * 0.6f };
-		color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		renderText(pauseStr, position.data(), color.data(), 2.0f);
-
-		std::string resumeStr = "Press P to resume";
-		position = {static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - static_cast<float>(resumeStr.length()*20*0.9),   m_viewport1[3] - m_viewport1[3] * 0.5f };
-		color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		renderText(resumeStr, position.data(), color.data(), 1.0f);
-
-		std::string restartStr = "Press R to restart";
-		position = { static_cast<float>(m_viewport1[0] + m_viewport1[2] * 0.50) - static_cast<float>(restartStr.length()*20*0.9),   m_viewport1[3] - m_viewport1[3] * 0.6f };
-		color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		renderText(restartStr, position.data(), color.data(), 1.0f);
 	}
 
 	// Restore original matrices
@@ -2069,6 +2074,11 @@ void buildScene()
 	float specMotor[] = {0.2f, 0.2f, 0.2f, 1.0f};
 	float emisMotor[] = {0.0f, 0.0f, 0.0f, 1.0f};
 
+	float ambPack[]  = { 0.6f, 0.45f, 0.1f, 1.0f };
+	float diffPack[] = { 1.0f, 0.85f, 0.2f, 1.0f }; 
+	float specPack[] = { 0.9f, 0.8f, 0.5f, 1.0f }; 
+	float emisPack[] = { 0.1f, 0.08f, 0.02f, 1.0f };
+
 	float ambFireworks[]  = { 0.3f, 0.1f, 0.0f, 1.0f };   
 	float diffFireworks[] = { 0.9f, 0.3f, 0.0f, 1.0f }; 
 	float specFireworks[] = { 0.9f, 0.9f, 0.9f, 1.0f };
@@ -2088,13 +2098,21 @@ void buildScene()
 	allMeshes.quad.mat.texCount = texcount;
 
 	// Cube
-	allMeshes.cube = createCube();
-	memcpy(allMeshes.cube.mat.ambient, amb, 4 * sizeof(float));
-	memcpy(allMeshes.cube.mat.diffuse, diff, 4 * sizeof(float));
-	memcpy(allMeshes.cube.mat.specular, spec, 4 * sizeof(float));
-	memcpy(allMeshes.cube.mat.emissive, emissive, 4 * sizeof(float));
-	allMeshes.cube.mat.shininess = shininess;
-	allMeshes.cube.mat.texCount = texcount;
+	allMeshes.cube[0] = createCube();
+	memcpy(allMeshes.cube[0].mat.ambient, amb, 4 * sizeof(float));
+	memcpy(allMeshes.cube[0].mat.diffuse, diff, 4 * sizeof(float));
+	memcpy(allMeshes.cube[0].mat.specular, spec, 4 * sizeof(float));
+	memcpy(allMeshes.cube[0].mat.emissive, emissive, 4 * sizeof(float));
+	allMeshes.cube[0].mat.shininess = shininess;
+	allMeshes.cube[0].mat.texCount = texcount;
+
+	allMeshes.cube[1] = createCube();
+	memcpy(allMeshes.cube[1].mat.ambient, ambPack, 4 * sizeof(float));
+	memcpy(allMeshes.cube[1].mat.diffuse, diffPack, 4 * sizeof(float));
+	memcpy(allMeshes.cube[1].mat.specular, specPack, 4 * sizeof(float));
+	memcpy(allMeshes.cube[1].mat.emissive, emisPack, 4 * sizeof(float));
+	allMeshes.cube[1].mat.shininess = shininess;
+	allMeshes.cube[1].mat.texCount = texcount;
 
 	// Sphere
 	allMeshes.sphere[0] = createSphere(1.0f, 16);
@@ -2151,7 +2169,7 @@ void buildScene()
 		obj.rotationSpeed = 0.01f + (rand() % 5);
 		obj.meshID = 2 + (i % 2);
 		obj.active = true;
-		obj.aabb = allMeshes.cube.aabb;
+		obj.aabb = allMeshes.cube[0].aabb;
 		flyingObjects.push_back(obj);
 	}
 
@@ -2197,7 +2215,7 @@ void buildScene()
 			b.depth = buildingD;
 			b.row = r;
 			b.col = c;
-			b.aabb = allMeshes.cube.aabb;
+			b.aabb = allMeshes.cube[0].aabb;
 
 			if (isQuadrantII) {
 				// Tall skyscrapers, maybe spaced regularly
@@ -2232,7 +2250,7 @@ void buildScene()
         lamp.position[1] = 0.0f;
         lamp.position[2] = lz;
         lamp.height = ly;
-        lamp.aabb = allMeshes.cube.aabb;
+        lamp.aabb = allMeshes.cube[0].aabb;
 
         lampPosts.push_back(lamp);
     }
@@ -2266,7 +2284,7 @@ void buildScene()
 		drone.direction[0] = 0.0f;
 		drone.direction[1] = 0.0f;
 		drone.direction[2] = -1.0f;
-		drone.aabb = allMeshes.cube.aabb;
+		drone.aabb = allMeshes.cube[0].aabb;
 
 		drone.battery = 100.0f;
 		drone.points = 0;
@@ -2275,7 +2293,7 @@ void buildScene()
 	// --- INITIALIZE PACKAGE ---
 	{
 		randomPackagePos();
-		package.aabb = allMeshes.cube.aabb;
+		package.aabb = allMeshes.cube[0].aabb;
 	}
 
 	floorObj.aabb = allMeshes.quad.aabb;
