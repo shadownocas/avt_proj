@@ -431,6 +431,7 @@ void randomPackagePos(){
     } while (goalIndex == randomIndex);
 
     buildings[goalIndex].goal = true;
+	buildings[randomIndex].goal = true;
 
     float height = buildingHeights[chosen.row][chosen.col];
     package.position[0] = chosen.position[0] + chosen.width / 2.0f - 0.5f; // subtract half package size
@@ -459,13 +460,16 @@ void restartDrone(){
 	drone.rotation[2] = 0.0f;
 
 	drone.speed = 0.0f;
+	finalScore = 0;
+
+	gameWin = false;
+	pause = false;
 }
 
 void restartGoal(){
 	for (Building& b : buildings) {
         if (b.goal) {
             b.goal = false;
-            break; // assuming only one goal at a time
         }
     }
 }
@@ -733,11 +737,11 @@ void updateFlyingObjects(float dt){
         if (obj.rotationAngle > 360.0f) obj.rotationAngle -= 360.0f;
 
 		// Respawn if out of visible region
-		if (fabs(obj.position[0]) > 150 || fabs(obj.position[2]) > 150)
+		if (fabs(obj.position[0]) > 320 || fabs(obj.position[2]) > 320)
 		{
-			obj.position[0] = (rand() % 200 - 100);
-			obj.position[1] = 10.0f + rand() % 30;
-			obj.position[2] = (rand() % 200 - 100);
+			obj.position[0] = (rand() % 400 - 100);
+			obj.position[1] = 30.0f + rand() % 30;
+			obj.position[2] = (rand() % 400 - 100);
 
 			float angle = (rand() % 360) * 3.14159f / 180.0f;
 			obj.direction[0] = cos(angle);
@@ -765,7 +769,7 @@ void updatePackage(float dt) {
     float offsetZ = cosf(yawRad) * cosf(pitchRad);
 
     package.position[0] = pivotX - offsetX;
-    package.position[1] = pivotY ;
+    package.position[1] = pivotY;
     package.position[2] = pivotZ - offsetZ;
 
     package.rotation[0] = drone.rotation[0];
@@ -1903,6 +1907,7 @@ void processKeys(unsigned char key, int xx, int yy)
 		printf("paused game!\n");
 		pause = !pause;
 		break;
+	case 'R':
 	case 'r':
 		printf("restart game!\n");
 		restart = true;
@@ -2132,9 +2137,9 @@ void buildScene()
 	{
 		FlyingObject obj;
 
-		obj.position[0] = (rand() % 200 - 100);
-		obj.position[1] = 10.0f + rand() % 30;
-		obj.position[2] = (rand() % 200 - 100);
+		obj.position[0] = (rand() % 400 - 100);
+		obj.position[1] = 30.0f + rand() % 30;
+		obj.position[2] = (rand() % 400 - 100);
 
 		float angle = (rand() % 360) * 3.14159f / 180.0f;
 		obj.direction[0] = cos(angle);
