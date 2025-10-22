@@ -230,6 +230,7 @@ void main() {
     else if (texMode == 13) {
         // Shadow: black color with slight transparency
         colorOut = vec4(0.0, 0.0, 0.0, 0.5);
+        return;
     }
     else if (texMode == 14) { //Skybox
         vec3 cubeColor = texture(texmap14, skyboxTexCoord).rgb;

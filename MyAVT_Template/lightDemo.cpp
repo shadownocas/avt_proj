@@ -577,7 +577,7 @@ void updateDroneMovement(float dirXAdd, float dirZAdd, float rotXAdd, float rotZ
 }
 
 void manageBattery(float dt){
-	float drainRate = 0.33f;
+	float drainRate = 0.15f;
 	drone.battery -= (drone.speed / 4.0f) * drainRate * dt; //4 is max speed FIX
 
 	if (drone.battery < 0.0f) drone.battery = 0.0f;
