@@ -940,6 +940,10 @@ void renderText(const std::string& textStr, const float position[2], const float
 
 void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
     dataMesh data;
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     int screenMaxX = m_viewport[0] + m_viewport[2] - 1;
     int screenMaxY = m_viewport[1] + m_viewport[3] - 1;
@@ -990,6 +994,9 @@ void renderFlare(FLARE_DEF* flare, int lx, int ly, int* m_viewport) {
 
 		mu.popMatrix(gmu::MODEL);
 	}
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glDisable(GL_BLEND);
 }
 
 
@@ -1385,9 +1392,6 @@ void drawSceneObjects(bool shadowMode){
     }
 	renderer.setLampLights(pointLights, lampsOn);
 
-	int m_viewport[4];
-	glGetIntegerv(GL_VIEWPORT, m_viewport);
-	renderLampFlare(m_viewport);
 
 	// --- Draw package ---
 	{ 
@@ -1725,11 +1729,25 @@ void renderSim(void)
 	glDisable(GL_STENCIL_TEST);
 
 	drawSceneObjects(false);
+	draw_skybox();
+
+	{
+        int m_viewport[4];
+        glGetIntegerv(GL_VIEWPORT, m_viewport);
+        /* glDisable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); */
+
+        renderLampFlare(m_viewport);
+
+       /*  glDepthMask(GL_TRUE);
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND); */
+    }
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-	draw_skybox();
 
 	// ----- RENDER PARTICLES -----
 	if(fireworks){
